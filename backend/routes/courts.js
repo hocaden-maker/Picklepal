@@ -1,6 +1,6 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const db = require('../db');
+const { db } = require('../db');
 const { authenticate } = require('../middleware');
 
 const router = express.Router();
@@ -15,13 +15,13 @@ async function geocodeCourt(court) {
     );
     const hits = await r.json();
     if (hits[0]) {
-      db.prepare('UPDATE courts_cache SET lat = ?, lon = ?, geocoded = 1 WHERE id = ?')
+      await db.prepare('UPDATE courts_cache SET lat = ?, lon = ?, geocoded = 1 WHERE id = ?')
         .run(parseFloat(hits[0].lat), parseFloat(hits[0].lon), court.id);
     } else {
-      db.prepare('UPDATE courts_cache SET geocoded = 1 WHERE id = ?').run(court.id);
+      await db.prepare('UPDATE courts_cache SET geocoded = 1 WHERE id = ?').run(court.id);
     }
   } catch {
-    db.prepare('UPDATE courts_cache SET geocoded = 1 WHERE id = ?').run(court.id);
+    await db.prepare('UPDATE courts_cache SET geocoded = 1 WHERE id = ?').run(court.id);
   }
 }
 
@@ -29,15 +29,14 @@ router.get('/', authenticate, async (req, res) => {
   const { lat, lon, q } = req.query;
 
   if (q) {
-    const results = db.prepare(`SELECT * FROM courts_cache WHERE name LIKE ? OR city LIKE ? OR state LIKE ? ORDER BY name LIMIT 60`).all(`%${q}%`, `%${q}%`, `%${q}%`);
+    const results = await db.prepare(`SELECT * FROM courts_cache WHERE name ILIKE ? OR city ILIKE ? ORDER BY name LIMIT 60`).all(`%${q}%`, `%${q}%`);
     return res.json(results);
   }
 
-  // If a center is provided, try to fetch fresh OSM data for that area
   if (lat && lon) {
     const latF = parseFloat(lat), lonF = parseFloat(lon);
     const cacheKey = `${Math.round(latF * 10)},${Math.round(lonF * 10)}`;
-    const meta = db.prepare('SELECT value FROM courts_meta WHERE key = ?').get(`fetched_${cacheKey}`);
+    const meta = await db.prepare('SELECT value FROM courts_meta WHERE key = ?').get(`fetched_${cacheKey}`);
 
     if (!meta || Date.now() - parseInt(meta.value) > CACHE_TTL_MS) {
       const delta = 0.15;
@@ -53,20 +52,30 @@ router.get('/', authenticate, async (req, res) => {
             const elLon = el.lon ?? el.center?.lon;
             if (!elLat || !elLon) continue;
             const tags = el.tags || {};
-            db.prepare(`INSERT OR REPLACE INTO courts_cache (id, name, lat, lon, access, surface, indoor, address, city, lit, description, geocoded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
-              .run(id, tags.name || 'Pickleball Court', elLat, elLon, tags.access || 'public', tags.surface || '', tags.indoor === 'yes' ? 1 : 0, tags['addr:street'] || '', tags['addr:city'] || '', tags.lit === 'yes' ? 1 : 0, tags.description || '');
+            await db.query(
+              `INSERT INTO courts_cache (id, name, lat, lon, access, surface, indoor, address, city, lit, description, geocoded)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 1)
+               ON CONFLICT (id) DO UPDATE SET
+                 name = EXCLUDED.name, lat = EXCLUDED.lat, lon = EXCLUDED.lon,
+                 access = EXCLUDED.access, surface = EXCLUDED.surface, indoor = EXCLUDED.indoor,
+                 address = EXCLUDED.address, city = EXCLUDED.city, lit = EXCLUDED.lit,
+                 description = EXCLUDED.description, geocoded = 1`,
+              [id, tags.name || 'Pickleball Court', elLat, elLon, tags.access || 'public', tags.surface || '', tags.indoor === 'yes' ? 1 : 0, tags['addr:street'] || '', tags['addr:city'] || '', tags.lit === 'yes' ? 1 : 0, tags.description || '']
+            );
           }
-          db.prepare('INSERT OR REPLACE INTO courts_meta (key, value) VALUES (?, ?)').run(`fetched_${cacheKey}`, Date.now().toString());
+          await db.query(
+            `INSERT INTO courts_meta (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+            [`fetched_${cacheKey}`, Date.now().toString()]
+          );
         }
       } catch {}
     }
   }
 
-  // Return courts sorted by distance when location is provided
   if (lat && lon) {
     const latF = parseFloat(lat), lonF = parseFloat(lon);
-    const delta = 0.75; // ~80 km bounding box
-    const rows = db.prepare(`
+    const delta = 0.75;
+    const rows = await db.prepare(`
       SELECT * FROM courts_cache
       WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?
         AND lat != 0 AND lon != 0
@@ -82,31 +91,30 @@ router.get('/', authenticate, async (req, res) => {
 
     res.json(withDist);
 
-    // Background: geocode any seed courts that still have approximate coordinates
     const needsGeocode = withDist.filter(c => !c.geocoded);
     if (needsGeocode.length > 0) {
       (async () => {
         for (const court of needsGeocode.slice(0, 5)) {
           await geocodeCourt(court);
-          await new Promise(r => setTimeout(r, 1200)); // respect Nominatim 1 req/sec limit
+          await new Promise(r => setTimeout(r, 1200));
         }
       })();
     }
     return;
   }
 
-  const courts = db.prepare('SELECT * FROM courts_cache ORDER BY name LIMIT 150').all();
+  const courts = await db.prepare('SELECT * FROM courts_cache ORDER BY name LIMIT 150').all();
   res.json(courts);
 });
 
-router.get('/:id', authenticate, (req, res) => {
-  const court = db.prepare('SELECT * FROM courts_cache WHERE id = ?').get(req.params.id);
+router.get('/:id', authenticate, async (req, res) => {
+  const court = await db.prepare('SELECT * FROM courts_cache WHERE id = ?').get(req.params.id);
   if (!court) return res.status(404).json({ error: 'Court not found' });
   res.json(court);
 });
 
-router.get('/:id/posts', authenticate, (req, res) => {
-  const posts = db.prepare(`
+router.get('/:id/posts', authenticate, async (req, res) => {
+  const posts = await db.prepare(`
     SELECT p.*, u.username, u.display_name, u.avatar, u.dupr_rating, u.dupr_verified,
       (SELECT COUNT(1) FROM likes WHERE post_id = p.id AND user_id = ?) as liked
     FROM posts p JOIN users u ON p.user_id = u.id
@@ -116,16 +124,16 @@ router.get('/:id/posts', authenticate, (req, res) => {
   res.json(posts);
 });
 
-router.post('/:id/recommend', authenticate, (req, res) => {
+router.post('/:id/recommend', authenticate, async (req, res) => {
   const { user_id } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id required' });
-  const court = db.prepare('SELECT * FROM courts_cache WHERE id = ?').get(req.params.id);
+  const court = await db.prepare('SELECT * FROM courts_cache WHERE id = ?').get(req.params.id);
   if (!court) return res.status(404).json({ error: 'Court not found' });
-  if (!db.prepare('SELECT 1 FROM users WHERE id = ?').get(user_id)) return res.status(404).json({ error: 'User not found' });
+  if (!await db.prepare('SELECT 1 FROM users WHERE id = ?').get(user_id)) return res.status(404).json({ error: 'User not found' });
   const accessLabel = court.access === 'public' ? 'free' : court.access === 'fee' ? 'pay-to-play' : 'members only';
   const courts = court.court_count ? `${court.court_count} courts` : 'courts';
   const msg = `🏓 Court rec: ${court.name} — ${courts}, ${accessLabel}${court.city ? ` in ${court.city}` : ''}. Thought you'd love it!`;
-  db.prepare('INSERT INTO dm_messages (id, sender_id, receiver_id, content) VALUES (?, ?, ?, ?)')
+  await db.prepare('INSERT INTO dm_messages (id, sender_id, receiver_id, content) VALUES (?, ?, ?, ?)')
     .run(uuidv4(), req.user.id, user_id, msg);
   res.json({ success: true });
 });

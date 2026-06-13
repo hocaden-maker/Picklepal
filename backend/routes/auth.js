@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const db = require('../db');
+const { db } = require('../db');
 const { authenticate, JWT_SECRET } = require('../middleware');
 
 async function verifyGoogleToken(credential) {
@@ -22,16 +22,16 @@ router.post('/register', async (req, res) => {
   const { username, email, password, display_name, skill_level, location, lat, lng } = req.body;
   if (!username || !email || !password || !display_name)
     return res.status(400).json({ error: 'All fields required' });
-  if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email.toLowerCase()))
+  if (await db.prepare('SELECT 1 FROM users WHERE email = ?').get(email.toLowerCase()))
     return res.status(409).json({ error: 'Email already in use' });
-  if (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username.toLowerCase()))
+  if (await db.prepare('SELECT 1 FROM users WHERE username = ?').get(username.toLowerCase()))
     return res.status(409).json({ error: 'Username taken' });
   const id = uuidv4();
   const hashed = await bcrypt.hash(password, 10);
   const hasLoc = lat && lng && parseFloat(lat) !== 0 && parseFloat(lng) !== 0;
-  db.prepare('INSERT INTO users (id, username, email, password, display_name, skill_level, avatar, location, lat, lng, location_public) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+  await db.prepare('INSERT INTO users (id, username, email, password, display_name, skill_level, avatar, location, lat, lng, location_public) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run(id, username.toLowerCase(), email.toLowerCase(), hashed, display_name, skill_level || 'intermediate', '', location || '', hasLoc ? parseFloat(lat) : 0, hasLoc ? parseFloat(lng) : 0, hasLoc ? 1 : 0);
-  const user = db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(id);
+  const user = await db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(id);
   const token = jwt.sign({ id }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ token, user });
 });
@@ -39,20 +39,19 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-  const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
+  const row = await db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
   if (!row) return res.status(401).json({ error: 'No account found with that email' });
-  // Google-only accounts have no password — give a clear message instead of crashing
   if (!row.password) return res.status(401).json({ error: 'This account uses Google Sign-In. Please tap "Sign in with Google".' });
   let valid = false;
   try { valid = await bcrypt.compare(password, row.password); } catch {}
   if (!valid) return res.status(401).json({ error: 'Incorrect password' });
-  const user = db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(row.id);
+  const user = await db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(row.id);
   const token = jwt.sign({ id: row.id }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ token, user });
 });
 
-router.get('/me', authenticate, (req, res) => {
-  const user = db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(req.user.id);
+router.get('/me', authenticate, async (req, res) => {
+  const user = await db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(req.user.id);
   if (!user) return res.status(404).json({ error: 'Not found' });
   res.json(user);
 });
@@ -63,21 +62,21 @@ router.post('/google', async (req, res) => {
   try {
     const payload = await verifyGoogleToken(credential);
     const { sub: googleId, email, name, picture } = payload;
-    let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
+    let user = await db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
     if (!user) {
       const id = uuidv4();
       const base = (name || email.split('@')[0]).toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
       let username = base;
       let n = 1;
-      while (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username)) {
+      while (await db.prepare('SELECT 1 FROM users WHERE username = ?').get(username)) {
         username = `${base}${n++}`;
       }
-      db.prepare('INSERT INTO users (id, username, email, password, display_name, avatar, skill_level) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      await db.prepare('INSERT INTO users (id, username, email, password, display_name, avatar, skill_level) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(id, username, email.toLowerCase(), '', name || username, picture || '', 'intermediate');
-      user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+      user = await db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     }
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
-    const safe = db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(user.id);
+    const safe = await db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(user.id);
     res.json({ token, user: safe });
   } catch (err) {
     console.error('Google auth error:', err.message);
@@ -89,11 +88,11 @@ router.put('/password', authenticate, async (req, res) => {
   const { current_password, new_password } = req.body;
   if (!current_password || !new_password) return res.status(400).json({ error: 'Both fields required' });
   if (new_password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  const row = await db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   if (!row || !await bcrypt.compare(current_password, row.password))
     return res.status(401).json({ error: 'Current password is incorrect' });
   const hashed = await bcrypt.hash(new_password, 10);
-  db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, req.user.id);
+  await db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, req.user.id);
   res.json({ success: true });
 });
 

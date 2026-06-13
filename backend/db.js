@@ -1,16 +1,60 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const { Pool } = require('pg');
 const fs = require('fs');
+const path = require('path');
 
-const db = new Database(path.join(__dirname, 'rally.db'));
-db.pragma('journal_mode = WAL');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 10,
+});
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
+// Convert ? placeholders to $1, $2, ... for PostgreSQL
+function toPostgres(sql) {
+  if (/\$\d+/.test(sql)) return sql; // already pg-style
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+}
+
+// pg returns COUNT() as bigint strings — convert back to numbers
+function convertRow(row) {
+  if (!row) return null;
+  const out = {};
+  for (const [k, v] of Object.entries(row)) {
+    out[k] = typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : v;
+  }
+  return out;
+}
+
+const db = {
+  prepare(sql) {
+    const pgSql = toPostgres(sql);
+    return {
+      run: async (...args) => {
+        const res = await pool.query(pgSql, args.flat());
+        return { changes: res.rowCount };
+      },
+      get: async (...args) => {
+        const res = await pool.query(pgSql, args.flat());
+        return convertRow(res.rows[0]) ?? null;
+      },
+      all: async (...args) => {
+        const res = await pool.query(pgSql, args.flat());
+        return res.rows.map(convertRow);
+      },
+    };
+  },
+  async query(sql, params = []) {
+    const res = await pool.query(sql, params);
+    return res.rows.map(convertRow);
+  },
+};
+
+async function initDb() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
+    password TEXT NOT NULL DEFAULT '',
     display_name TEXT DEFAULT '',
     bio TEXT DEFAULT '',
     avatar TEXT DEFAULT '',
@@ -21,6 +65,8 @@ db.exec(`
     skill_level TEXT DEFAULT 'intermediate',
     dupr_id TEXT DEFAULT '',
     dupr_rating REAL DEFAULT 0,
+    singles_rating REAL DEFAULT 0,
+    doubles_rating REAL DEFAULT 0,
     dupr_verified INTEGER DEFAULT 0,
     wins INTEGER DEFAULT 0,
     losses INTEGER DEFAULT 0,
@@ -29,17 +75,17 @@ db.exec(`
     posts_count INTEGER DEFAULT 0,
     is_available INTEGER DEFAULT 0,
     location_public INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-  CREATE TABLE IF NOT EXISTS follows (
+  await pool.query(`CREATE TABLE IF NOT EXISTS follows (
     follower_id TEXT NOT NULL,
     following_id TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (follower_id, following_id)
-  );
+  )`);
 
-  CREATE TABLE IF NOT EXISTS posts (
+  await pool.query(`CREATE TABLE IF NOT EXISTS posts (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     content TEXT DEFAULT '',
@@ -52,50 +98,50 @@ db.exec(`
     court_name TEXT DEFAULT '',
     likes_count INTEGER DEFAULT 0,
     comments_count INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-  CREATE TABLE IF NOT EXISTS likes (
+  await pool.query(`CREATE TABLE IF NOT EXISTS likes (
     user_id TEXT NOT NULL,
     post_id TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, post_id)
-  );
+  )`);
 
-  CREATE TABLE IF NOT EXISTS comments (
+  await pool.query(`CREATE TABLE IF NOT EXISTS comments (
     id TEXT PRIMARY KEY,
     post_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     content TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-  CREATE TABLE IF NOT EXISTS stories (
+  await pool.query(`CREATE TABLE IF NOT EXISTS stories (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     image_url TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-  CREATE TABLE IF NOT EXISTS invites (
+  await pool.query(`CREATE TABLE IF NOT EXISTS invites (
     id TEXT PRIMARY KEY,
     sender_id TEXT NOT NULL,
     receiver_id TEXT NOT NULL,
     message TEXT DEFAULT '',
     status TEXT DEFAULT 'pending',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-  CREATE TABLE IF NOT EXISTS dm_messages (
+  await pool.query(`CREATE TABLE IF NOT EXISTS dm_messages (
     id TEXT PRIMARY KEY,
     sender_id TEXT NOT NULL,
     receiver_id TEXT NOT NULL,
     content TEXT NOT NULL,
     read INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-  CREATE TABLE IF NOT EXISTS courts_cache (
+  await pool.query(`CREATE TABLE IF NOT EXISTS courts_cache (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     lat REAL,
@@ -109,14 +155,14 @@ db.exec(`
     description TEXT DEFAULT '',
     court_count INTEGER DEFAULT 0,
     geocoded INTEGER DEFAULT 0
-  );
+  )`);
 
-  CREATE TABLE IF NOT EXISTS courts_meta (
+  await pool.query(`CREATE TABLE IF NOT EXISTS courts_meta (
     key TEXT PRIMARY KEY,
     value TEXT
-  );
+  )`);
 
-  CREATE TABLE IF NOT EXISTS threads (
+  await pool.query(`CREATE TABLE IF NOT EXISTS threads (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     category TEXT NOT NULL,
@@ -124,77 +170,57 @@ db.exec(`
     content TEXT NOT NULL,
     reply_count INTEGER DEFAULT 0,
     like_count INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+    dislike_count INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-  CREATE TABLE IF NOT EXISTS thread_replies (
+  await pool.query(`CREATE TABLE IF NOT EXISTS thread_replies (
     id TEXT PRIMARY KEY,
     thread_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     content TEXT NOT NULL,
+    parent_id TEXT DEFAULT NULL,
     like_count INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+    dislike_count INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-  CREATE TABLE IF NOT EXISTS thread_likes (
+  await pool.query(`CREATE TABLE IF NOT EXISTS thread_likes (
     user_id TEXT NOT NULL,
     thread_id TEXT NOT NULL,
     vote TEXT DEFAULT 'like',
     PRIMARY KEY (user_id, thread_id)
-  );
+  )`);
 
-  CREATE TABLE IF NOT EXISTS reply_votes (
+  await pool.query(`CREATE TABLE IF NOT EXISTS reply_votes (
     user_id TEXT NOT NULL,
     reply_id TEXT NOT NULL,
     vote TEXT NOT NULL,
     PRIMARY KEY (user_id, reply_id)
-  );
-`);
+  )`);
 
-// Migrate existing DBs that predate parent_id on thread_replies
-try { db.exec(`ALTER TABLE thread_replies ADD COLUMN parent_id TEXT DEFAULT NULL`); } catch {}
-// Migrate for like/dislike support
-try { db.exec(`ALTER TABLE threads ADD COLUMN dislike_count INTEGER DEFAULT 0`); } catch {}
-try { db.exec(`ALTER TABLE thread_replies ADD COLUMN dislike_count INTEGER DEFAULT 0`); } catch {}
-try { db.exec(`ALTER TABLE thread_likes ADD COLUMN vote TEXT DEFAULT 'like'`); } catch {}
-
-// Migrate existing DBs that predate cover_url / location_public columns
-try { db.exec(`ALTER TABLE users ADD COLUMN cover_url TEXT DEFAULT ''`); } catch {}
-try { db.exec(`ALTER TABLE users ADD COLUMN location_public INTEGER DEFAULT 0`); } catch {}
-// Migrate existing DBs that predate court_id / court_name on posts
-try { db.exec(`ALTER TABLE posts ADD COLUMN court_id TEXT DEFAULT NULL`); } catch {}
-try { db.exec(`ALTER TABLE posts ADD COLUMN court_name TEXT DEFAULT ''`); } catch {}
-// Migrate existing DBs that predate geocoded column on courts_cache
-try { db.exec(`ALTER TABLE courts_cache ADD COLUMN geocoded INTEGER DEFAULT 0`); } catch {}
-// Migrate existing DBs that predate singles_rating / doubles_rating columns
-try { db.exec(`ALTER TABLE users ADD COLUMN singles_rating REAL DEFAULT 0`); } catch {}
-try { db.exec(`ALTER TABLE users ADD COLUMN doubles_rating REAL DEFAULT 0`); } catch {}
-
-// Seed courts from bundled JSON.
-// If old seed courts exist without geocoded=1, replace them with GPS-accurate OSM data.
-try {
-  const oldSeeds = db.prepare("SELECT COUNT(*) as c FROM courts_cache WHERE id LIKE 'seed_%' AND geocoded = 0").get().c;
-  if (oldSeeds > 0) {
-    db.exec("DELETE FROM courts_cache WHERE id LIKE 'seed_%'");
-    console.log(`Removed ${oldSeeds} approximate seed courts — replacing with GPS-accurate data`);
-  }
-  const hasSeeds = db.prepare("SELECT COUNT(*) as c FROM courts_cache WHERE id LIKE 'seed_%'").get().c;
-  if (hasSeeds === 0) {
-    const seedPath = path.join(__dirname, 'data', 'courts_seed.json');
-    if (fs.existsSync(seedPath)) {
-      const courts = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
-      const stmt = db.prepare(
-        'INSERT OR IGNORE INTO courts_cache (id, name, lat, lon, city, court_count, access, surface, description, geocoded) VALUES (?,?,?,?,?,?,?,?,?,1)'
-      );
-      let n = 0;
-      for (const c of courts) {
-        if (!c.lat || !c.lon) continue;
-        const id = 'seed_' + (++n);
-        stmt.run(id, c.name || '', c.lat, c.lon, c.city || '', c.court_count || 0, c.access || 'public', c.surface || '', c.description || '');
+  // Seed courts from bundled JSON (only on first boot)
+  try {
+    const [{ c }] = await db.query("SELECT COUNT(*) as c FROM courts_cache WHERE id LIKE 'seed_%'");
+    if (Number(c) === 0) {
+      const seedPath = path.join(__dirname, 'data', 'courts_seed.json');
+      if (fs.existsSync(seedPath)) {
+        const courts = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+        let n = 0;
+        for (const court of courts) {
+          if (!court.lat || !court.lon) continue;
+          const id = 'seed_' + (++n);
+          await pool.query(
+            `INSERT INTO courts_cache (id, name, lat, lon, city, court_count, access, surface, description, geocoded)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1)
+             ON CONFLICT (id) DO NOTHING`,
+            [id, court.name || '', court.lat, court.lon, court.city || '', court.court_count || 0, court.access || 'public', court.surface || '', court.description || '']
+          );
+        }
+        console.log(`Seeded ${n} courts`);
       }
-      console.log(`Seeded ${n} GPS-accurate courts from OSM`);
     }
-  }
-} catch (e) { console.error('Seed error:', e.message); }
+  } catch (e) { console.error('Seed error:', e.message); }
+}
 
-module.exports = db;
+module.exports = { db, initDb };

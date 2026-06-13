@@ -1,14 +1,14 @@
 const express = require('express');
-const db = require('../db');
+const { db } = require('../db');
 const { authenticate } = require('../middleware');
 
 const router = express.Router();
 
 const PUB = 'id, username, display_name, bio, avatar, cover_url, location, lat, lng, dupr_id, dupr_rating, singles_rating, doubles_rating, dupr_verified, skill_level, wins, losses, followers_count, following_count, posts_count, is_available, location_public, created_at';
 
-router.get('/nearby', authenticate, (req, res) => {
+router.get('/nearby', authenticate, async (req, res) => {
   const { lat, lng } = req.query;
-  const users = db.prepare(`SELECT ${PUB} FROM users WHERE id != ? AND lat != 0 AND location_public = 1 ORDER BY dupr_rating DESC LIMIT 50`).all(req.user.id);
+  const users = await db.prepare(`SELECT ${PUB} FROM users WHERE id != ? AND lat != 0 AND location_public = 1 ORDER BY dupr_rating DESC LIMIT 50`).all(req.user.id);
   if (!lat || !lng) return res.json(users);
 
   const latF = parseFloat(lat), lngF = parseFloat(lng);
@@ -21,11 +21,11 @@ router.get('/nearby', authenticate, (req, res) => {
   res.json(withDist);
 });
 
-router.get('/search', authenticate, (req, res) => {
+router.get('/search', authenticate, async (req, res) => {
   const q = `%${req.query.q || ''}%`;
   const { skill, available } = req.query;
 
-  let where = 'WHERE (display_name LIKE ? OR username LIKE ?) AND id != ?';
+  let where = 'WHERE (display_name ILIKE ? OR username ILIKE ?) AND id != ?';
   const params = [q, q, req.user.id];
 
   if (skill && skill !== 'all') {
@@ -36,38 +36,38 @@ router.get('/search', authenticate, (req, res) => {
     where += ` AND is_available = 1`;
   }
 
-  const users = db.prepare(`SELECT ${PUB} FROM users ${where} ORDER BY dupr_rating DESC LIMIT 30`).all(...params);
+  const users = await db.prepare(`SELECT ${PUB} FROM users ${where} ORDER BY dupr_rating DESC LIMIT 30`).all(...params);
   res.json(users);
 });
 
-router.get('/:username', authenticate, (req, res) => {
-  const user = db.prepare(`SELECT ${PUB} FROM users WHERE username = ?`).get(req.params.username);
+router.get('/:username', authenticate, async (req, res) => {
+  const user = await db.prepare(`SELECT ${PUB} FROM users WHERE username = ?`).get(req.params.username);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  const isFollowing = !!db.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?').get(req.user.id, user.id);
+  const isFollowing = !!(await db.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?').get(req.user.id, user.id));
   res.json({ ...user, isFollowing });
 });
 
-router.post('/:username/follow', authenticate, (req, res) => {
-  const target = db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
+router.post('/:username/follow', authenticate, async (req, res) => {
+  const target = await db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
   if (!target) return res.status(404).json({ error: 'User not found' });
   if (target.id === req.user.id) return res.status(400).json({ error: 'Cannot follow yourself' });
-  const existing = db.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?').get(req.user.id, target.id);
+  const existing = await db.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?').get(req.user.id, target.id);
   if (existing) {
-    db.prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?').run(req.user.id, target.id);
-    db.prepare('UPDATE users SET followers_count = MAX(0, followers_count - 1) WHERE id = ?').run(target.id);
-    db.prepare('UPDATE users SET following_count = MAX(0, following_count - 1) WHERE id = ?').run(req.user.id);
+    await db.prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?').run(req.user.id, target.id);
+    await db.prepare('UPDATE users SET followers_count = GREATEST(0, followers_count - 1) WHERE id = ?').run(target.id);
+    await db.prepare('UPDATE users SET following_count = GREATEST(0, following_count - 1) WHERE id = ?').run(req.user.id);
     res.json({ following: false });
   } else {
-    db.prepare('INSERT INTO follows (follower_id, following_id) VALUES (?, ?)').run(req.user.id, target.id);
-    db.prepare('UPDATE users SET followers_count = followers_count + 1 WHERE id = ?').run(target.id);
-    db.prepare('UPDATE users SET following_count = following_count + 1 WHERE id = ?').run(req.user.id);
+    await db.prepare('INSERT INTO follows (follower_id, following_id) VALUES (?, ?)').run(req.user.id, target.id);
+    await db.prepare('UPDATE users SET followers_count = followers_count + 1 WHERE id = ?').run(target.id);
+    await db.prepare('UPDATE users SET following_count = following_count + 1 WHERE id = ?').run(req.user.id);
     res.json({ following: true });
   }
 });
 
-router.put('/me', authenticate, (req, res) => {
+router.put('/me', authenticate, async (req, res) => {
   const { display_name, bio, location, lat, lng, skill_level, avatar, cover_url, is_available, location_public } = req.body;
-  db.prepare(`UPDATE users SET
+  await db.prepare(`UPDATE users SET
     display_name = COALESCE(?, display_name),
     bio = COALESCE(?, bio),
     location = COALESCE(?, location),
@@ -80,22 +80,22 @@ router.put('/me', authenticate, (req, res) => {
     location_public = COALESCE(?, location_public)
     WHERE id = ?`)
     .run(display_name ?? null, bio ?? null, location ?? null, lat ?? null, lng ?? null, skill_level ?? null, avatar ?? null, cover_url ?? null, is_available ?? null, location_public ?? null, req.user.id);
-  const user = db.prepare(`SELECT ${PUB} FROM users WHERE id = ?`).get(req.user.id);
+  const user = await db.prepare(`SELECT ${PUB} FROM users WHERE id = ?`).get(req.user.id);
   res.json(user);
 });
 
-router.delete('/me', authenticate, (req, res) => {
+router.delete('/me', authenticate, async (req, res) => {
   const { id } = req.user;
-  db.prepare('DELETE FROM likes WHERE user_id = ?').run(id);
-  db.prepare('DELETE FROM comments WHERE user_id = ?').run(id);
-  db.prepare('DELETE FROM stories WHERE user_id = ?').run(id);
-  db.prepare('DELETE FROM invites WHERE sender_id = ? OR receiver_id = ?').run(id, id);
-  db.prepare('DELETE FROM dm_messages WHERE sender_id = ? OR receiver_id = ?').run(id, id);
-  db.prepare('DELETE FROM posts WHERE user_id = ?').run(id);
-  db.prepare('UPDATE users SET followers_count = MAX(0, followers_count - 1) WHERE id IN (SELECT following_id FROM follows WHERE follower_id = ?)').run(id);
-  db.prepare('UPDATE users SET following_count = MAX(0, following_count - 1) WHERE id IN (SELECT follower_id FROM follows WHERE following_id = ?)').run(id);
-  db.prepare('DELETE FROM follows WHERE follower_id = ? OR following_id = ?').run(id, id);
-  db.prepare('DELETE FROM users WHERE id = ?').run(id);
+  await db.prepare('DELETE FROM likes WHERE user_id = ?').run(id);
+  await db.prepare('DELETE FROM comments WHERE user_id = ?').run(id);
+  await db.prepare('DELETE FROM stories WHERE user_id = ?').run(id);
+  await db.prepare('DELETE FROM invites WHERE sender_id = ? OR receiver_id = ?').run(id, id);
+  await db.prepare('DELETE FROM dm_messages WHERE sender_id = ? OR receiver_id = ?').run(id, id);
+  await db.prepare('DELETE FROM posts WHERE user_id = ?').run(id);
+  await db.prepare('UPDATE users SET followers_count = GREATEST(0, followers_count - 1) WHERE id IN (SELECT following_id FROM follows WHERE follower_id = ?)').run(id);
+  await db.prepare('UPDATE users SET following_count = GREATEST(0, following_count - 1) WHERE id IN (SELECT follower_id FROM follows WHERE following_id = ?)').run(id);
+  await db.prepare('DELETE FROM follows WHERE follower_id = ? OR following_id = ?').run(id, id);
+  await db.prepare('DELETE FROM users WHERE id = ?').run(id);
   res.json({ success: true });
 });
 

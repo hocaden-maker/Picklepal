@@ -1,5 +1,5 @@
 const express = require('express');
-const db = require('../db');
+const { db } = require('../db');
 const { authenticate } = require('../middleware');
 
 const router = express.Router();
@@ -31,15 +31,12 @@ function formatPlayer(p) {
   };
 }
 
-// ── Authenticate with DUPR using the user's own credentials ──────────────────
-// Never stores the DUPR password — only the resulting player data.
 router.post('/auth', authenticate, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password)
     return res.status(400).json({ error: 'DUPR email and password are required' });
 
   try {
-    // 1. Login to DUPR
     const authRes = await fetch(`${DUPR_API}/auth/v1.0/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -59,19 +56,16 @@ router.post('/auth', authenticate, async (req, res) => {
 
     const authHeader = { Authorization: `Bearer ${token}` };
 
-    // 2. Resolve player ID — from response body or JWT payload
     let playerId = authData.result?.playerId || authData.result?.player?.id;
     if (!playerId) {
       const payload = decodeJwtPayload(token);
       playerId = payload?.player_id || payload?.playerId;
       if (!playerId && payload?.sub) {
-        // sub is often "player:12345" or just the numeric id
         const m = String(payload.sub).match(/(\d+)/);
         if (m) playerId = m[1];
       }
     }
 
-    // 3. Fetch profile — try by ID, then /me fallback
     let profile = null;
 
     if (playerId) {
@@ -97,8 +91,7 @@ router.post('/auth', authenticate, async (req, res) => {
   }
 });
 
-// ── Save confirmed DUPR profile to app account ───────────────────────────────
-router.post('/connect', authenticate, (req, res) => {
+router.post('/connect', authenticate, async (req, res) => {
   const { dupr_id, singles_rating, doubles_rating } = req.body;
   if (!dupr_id) return res.status(400).json({ error: 'DUPR ID is required' });
 
@@ -112,17 +105,16 @@ router.post('/connect', authenticate, (req, res) => {
 
   const primary = Math.max(singles ?? 0, doubles ?? 0);
 
-  db.prepare(`UPDATE users SET
+  await db.prepare(`UPDATE users SET
     dupr_id = ?, dupr_rating = ?, singles_rating = ?, doubles_rating = ?, dupr_verified = 1
     WHERE id = ?`).run(String(dupr_id), primary, singles, doubles, req.user.id);
 
-  const user = db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(req.user.id);
+  const user = await db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(req.user.id);
   res.json({ user });
 });
 
-// ── Disconnect ───────────────────────────────────────────────────────────────
-router.delete('/disconnect', authenticate, (req, res) => {
-  db.prepare(`UPDATE users SET
+router.delete('/disconnect', authenticate, async (req, res) => {
+  await db.prepare(`UPDATE users SET
     dupr_id = '', dupr_rating = 0, singles_rating = 0, doubles_rating = 0, dupr_verified = 0
     WHERE id = ?`).run(req.user.id);
   res.json({ success: true });

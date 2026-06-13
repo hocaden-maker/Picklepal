@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
-require('./db');
+const { initDb } = require('./db');
 
 const app = express();
 const server = http.createServer(app);
@@ -42,11 +42,19 @@ app.use('/api/invites', require('./routes/invites'));
 app.use('/api/stories', require('./routes/stories'));
 app.use('/api/threads', require('./routes/threads'));
 
-
 io.on('connection', socket => {
   socket.on('join', room => socket.join(room));
   socket.on('message', data => io.to(data.room).emit('message', data));
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => console.log(`🏓  Rally API  →  http://localhost:${PORT}`));
+
+async function start() {
+  await initDb();
+  server.listen(PORT, () => console.log(`🏓  Rally API  →  http://localhost:${PORT}`));
+}
+
+start().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});
