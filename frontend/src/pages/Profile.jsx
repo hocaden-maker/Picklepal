@@ -5,64 +5,97 @@ import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import PostCard from '../components/PostCard';
 
-function DUPRModal({ current, currentRating, onClose, onSave }) {
+function DUPRModal({ current, onClose, onSave }) {
   const [duprId, setDuprId] = useState(current || '');
-  const [duprRating, setDuprRating] = useState(currentRating > 0 ? String(currentRating) : '');
+  const [step, setStep] = useState('idle'); // idle | loading | found | saving | error
+  const [profile, setProfile] = useState(null);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const api = useApi();
 
-  const save = async () => {
-    if (!duprId.trim()) { setError('Please enter your DUPR ID.'); return; }
-    const rating = parseFloat(duprRating);
-    if (isNaN(rating) || rating < 1.0 || rating > 8.0) {
-      setError('Rating must be between 1.0 and 8.0');
-      return;
-    }
-    setLoading(true); setError('');
+  const lookup = async () => {
+    if (!duprId.trim()) return;
+    setStep('loading'); setError(''); setProfile(null);
     try {
-      const { user } = await api.post('/dupr/connect', { dupr_id: duprId.trim(), dupr_rating: rating });
+      const p = await api.get(`/dupr/lookup/${duprId.trim()}`);
+      setProfile(p);
+      setStep('found');
+    } catch (err) {
+      setError(err.message || 'No DUPR player found with that ID.');
+      setStep('error');
+    }
+  };
+
+  const connect = async () => {
+    if (!profile) return;
+    setStep('saving');
+    try {
+      const { user } = await api.post('/dupr/connect', {
+        dupr_id: profile.id,
+        singles_rating: profile.singles,
+        doubles_rating: profile.doubles,
+      });
       onSave(user);
-    } catch (err) { setError(err.message); }
-    setLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setStep('error');
+    }
   };
 
   return (
     <div className="drawer-backdrop" onClick={onClose}>
-      <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '60vh' }}>
+      <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '70vh' }}>
         <div className="drawer-handle" />
-        <div className="drawer-title">Link DUPR Rating</div>
+        <div className="drawer-title">Link DUPR Account</div>
         <div className="drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
-            Enter your DUPR ID and rating from{' '}
-            <strong>mydupr.com</strong> → Profile → Settings.
+            Enter your DUPR Player ID to pull your live singles &amp; doubles ratings.{' '}
+            <span style={{ color: 'var(--text-3)' }}>Find it at mydupr.com → Profile → Settings.</span>
           </p>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>DUPR ID</div>
-            <div className="field">
-              <span className="field-icon">🔢</span>
-              <input placeholder="Your DUPR Player ID" value={duprId} onChange={e => setDuprId(e.target.value)} />
-            </div>
+
+          <div className="field">
+            <span className="field-icon">🔢</span>
+            <input
+              placeholder="Your DUPR Player ID"
+              value={duprId}
+              onChange={e => { setDuprId(e.target.value); setStep('idle'); setProfile(null); }}
+              disabled={step === 'loading' || step === 'saving'}
+            />
+            <button className="btn btn-primary btn-xs" onClick={lookup}
+              disabled={step === 'loading' || step === 'saving' || !duprId.trim()}>
+              {step === 'loading' ? '…' : 'Look Up'}
+            </button>
           </div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>Your Rating</div>
-            <div className="field">
-              <span className="field-icon">🏅</span>
-              <input
-                type="number"
-                step="0.001"
-                min="1"
-                max="8"
-                placeholder="e.g. 4.215"
-                value={duprRating}
-                onChange={e => setDuprRating(e.target.value)}
-              />
+
+          {error && (
+            <div className="auth-error" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{error}</span>
+              <button onClick={() => setStep('idle')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontWeight: 700, fontSize: 13 }}>Retry</button>
             </div>
-          </div>
-          {error && <div className="auth-error">{error}</div>}
-          <button className="btn btn-primary" onClick={save} disabled={loading || !duprId.trim() || !duprRating}>
-            {loading ? '…' : '🔗 Save DUPR Rating'}
-          </button>
+          )}
+
+          {(step === 'found' || step === 'saving') && profile && (
+            <div style={{ background: 'var(--bg-2)', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }}>
+              <div style={{ background: 'linear-gradient(135deg, #15803d, #166534)', padding: '12px 16px', color: 'white' }}>
+                <div style={{ fontWeight: 800, fontSize: 15 }}>{profile.fullName}</div>
+                {profile.location && <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2 }}>📍 {profile.location}</div>}
+                <div style={{ fontSize: 11, opacity: 0.65, marginTop: 3 }}>DUPR ID: {profile.id}</div>
+              </div>
+              <div style={{ padding: 14 }}>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                  {[['Singles', profile.singles, profile.singlesProvisional], ['Doubles', profile.doubles, profile.doublesProvisional]].map(([label, val, prov]) => (
+                    <div key={label} style={{ flex: 1, background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 3 }}>{label}</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: '#15803d' }}>{val != null ? val.toFixed(3) : '—'}</div>
+                      {prov && <div style={{ fontSize: 10, color: '#9ca3af' }}>provisional</div>}
+                    </div>
+                  ))}
+                </div>
+                <button className="btn btn-primary" style={{ width: '100%' }} onClick={connect} disabled={step === 'saving'}>
+                  {step === 'saving' ? '…' : '🔗 Link This Account'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -164,13 +197,19 @@ export default function Profile() {
 
         <div className="dupr-card" onClick={() => setShowDUPR(true)}>
           <div className="dupr-card-logo">DUPR</div>
-          <div className="dupr-card-info">
-            <div className="dupr-card-label">{user.dupr_verified ? 'Linked Rating' : 'Link DUPR Account'}</div>
+          <div className="dupr-card-info" style={{ flex: 1 }}>
+            <div className="dupr-card-label">{user.dupr_verified ? 'Verified Rating' : 'Link DUPR Account'}</div>
             {user.dupr_verified
-              ? <>
-                  <div className="dupr-card-rating">{user.dupr_rating?.toFixed(3)}</div>
-                  <div className="dupr-card-level">⭐ {user.skill_level} · Verified</div>
-                </>
+              ? <div style={{ display: 'flex', gap: 14, marginTop: 2 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600 }}>SINGLES</div>
+                    <div className="dupr-card-rating" style={{ lineHeight: 1 }}>{(user.singles_rating > 0 ? user.singles_rating : user.dupr_rating)?.toFixed(3)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600 }}>DOUBLES</div>
+                    <div className="dupr-card-rating" style={{ lineHeight: 1 }}>{(user.doubles_rating > 0 ? user.doubles_rating : user.dupr_rating)?.toFixed(3)}</div>
+                  </div>
+                </div>
               : <div className="dupr-card-rating" style={{ fontSize: 15, color: 'var(--text-2)' }}>Tap to connect your rating</div>
             }
           </div>
@@ -259,7 +298,7 @@ export default function Profile() {
         <div style={{ height: 16 }} />
       </div>
 
-      {showDUPR && <DUPRModal current={user.dupr_id} currentRating={user.dupr_rating} onClose={() => setShowDUPR(false)} onSave={u => { updateUser(u); setShowDUPR(false); }} />}
+      {showDUPR && <DUPRModal current={user.dupr_id} onClose={() => setShowDUPR(false)} onSave={u => { updateUser(u); setShowDUPR(false); }} />}
     </div>
   );
 }

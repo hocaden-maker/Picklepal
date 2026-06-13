@@ -125,6 +125,9 @@ try { db.exec(`ALTER TABLE posts ADD COLUMN court_id TEXT DEFAULT NULL`); } catc
 try { db.exec(`ALTER TABLE posts ADD COLUMN court_name TEXT DEFAULT ''`); } catch {}
 // Migrate existing DBs that predate geocoded column on courts_cache
 try { db.exec(`ALTER TABLE courts_cache ADD COLUMN geocoded INTEGER DEFAULT 0`); } catch {}
+// Migrate existing DBs that predate singles_rating / doubles_rating columns
+try { db.exec(`ALTER TABLE users ADD COLUMN singles_rating REAL DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN doubles_rating REAL DEFAULT 0`); } catch {}
 
 // Seed courts from bundled JSON.
 // If old seed courts exist without geocoded=1, replace them with GPS-accurate OSM data.

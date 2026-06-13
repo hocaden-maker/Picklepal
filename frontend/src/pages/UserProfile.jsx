@@ -78,10 +78,18 @@ export default function UserProfile() {
         {profile.dupr_verified ? (
           <div className="dupr-card" style={{ cursor: 'default' }}>
             <div className="dupr-card-logo">DUPR</div>
-            <div className="dupr-card-info">
-              <div className="dupr-card-label">Linked Rating</div>
-              <div className="dupr-card-rating">{profile.dupr_rating?.toFixed(3)}</div>
-              <div className="dupr-card-level">⭐ {profile.skill_level} · Verified</div>
+            <div className="dupr-card-info" style={{ flex: 1 }}>
+              <div className="dupr-card-label">Verified Rating</div>
+              <div style={{ display: 'flex', gap: 14, marginTop: 2 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600 }}>SINGLES</div>
+                  <div className="dupr-card-rating" style={{ lineHeight: 1 }}>{(profile.singles_rating > 0 ? profile.singles_rating : profile.dupr_rating)?.toFixed(3)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600 }}>DOUBLES</div>
+                  <div className="dupr-card-rating" style={{ lineHeight: 1 }}>{(profile.doubles_rating > 0 ? profile.doubles_rating : profile.dupr_rating)?.toFixed(3)}</div>
+                </div>
+              </div>
             </div>
             <div className="dupr-card-arrow">✓</div>
           </div>

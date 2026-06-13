@@ -4,7 +4,7 @@ const { authenticate } = require('../middleware');
 
 const router = express.Router();
 
-const PUB = 'id, username, display_name, bio, avatar, cover_url, location, lat, lng, dupr_id, dupr_rating, dupr_verified, skill_level, wins, losses, followers_count, following_count, posts_count, is_available, location_public, created_at';
+const PUB = 'id, username, display_name, bio, avatar, cover_url, location, lat, lng, dupr_id, dupr_rating, singles_rating, doubles_rating, dupr_verified, skill_level, wins, losses, followers_count, following_count, posts_count, is_available, location_public, created_at';
 
 router.get('/nearby', authenticate, (req, res) => {
   const { lat, lng } = req.query;

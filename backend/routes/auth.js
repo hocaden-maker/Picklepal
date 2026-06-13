@@ -16,7 +16,7 @@ async function verifyGoogleToken(credential) {
 
 const router = express.Router();
 
-const SAFE = 'id, username, email, display_name, bio, avatar, cover_url, location, lat, lng, skill_level, dupr_id, dupr_rating, dupr_verified, wins, losses, followers_count, following_count, posts_count, is_available';
+const SAFE = 'id, username, email, display_name, bio, avatar, cover_url, location, lat, lng, skill_level, dupr_id, dupr_rating, singles_rating, doubles_rating, dupr_verified, wins, losses, followers_count, following_count, posts_count, is_available';
 
 router.post('/register', async (req, res) => {
   const { username, email, password, display_name, skill_level } = req.body;
