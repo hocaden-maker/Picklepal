@@ -503,6 +503,7 @@ export default function MapScreen() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [showAllCourts, setShowAllCourts] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [zip, setZip] = useState('');
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const mapRef = useRef(null);
@@ -756,33 +757,109 @@ export default function MapScreen() {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <div className="section-header" style={{ paddingTop: 4 }}>
-            <span className="section-title">
-              🏓 Nearby Courts
-              {filters.courtAccess !== 'all' && (
-                <span style={{ fontSize: 11, fontWeight: 600, marginLeft: 6, color: 'var(--brand)', background: 'var(--brand-50)', padding: '1px 6px', borderRadius: 8 }}>
-                  {filters.courtAccess === 'public' ? 'Free' : filters.courtAccess === 'fee' ? 'Fee' : 'Members'}
-                </span>
-              )}
-            </span>
-            <span className="section-link" onClick={() => setShowAllCourts(true)}>See all</span>
+
+          {/* Find Courts Now card */}
+          <div style={{ padding: '8px 16px 0' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #FF5C35 0%, #FF9A00 100%)',
+              borderRadius: 20,
+              padding: '20px 18px 18px',
+              color: 'white',
+              boxShadow: '0 6px 24px rgba(255,92,53,0.35)',
+            }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>🏓</div>
+              <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.25, marginBottom: 4 }}>
+                Find Courts in Your City — Instantly
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.88, lineHeight: 1.5, marginBottom: 14 }}>
+                Enter your ZIP code to see pickleball courts near you on Google Maps
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={zip}
+                  onChange={e => setZip(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                  placeholder="ZIP code"
+                  inputMode="numeric"
+                  maxLength={5}
+                  style={{
+                    flex: 1, height: 44, borderRadius: 12,
+                    border: '2px solid rgba(255,255,255,0.4)',
+                    padding: '0 14px', fontSize: 15, fontWeight: 600,
+                    background: 'rgba(255,255,255,0.2)', color: 'white',
+                    outline: 'none', WebkitAppearance: 'none',
+                  }}
+                />
+                <a
+                  href={
+                    zip.length === 5
+                      ? `https://www.google.com/maps/search/pickleball+courts+near+${zip}`
+                      : myPos
+                        ? `https://www.google.com/maps/search/pickleball+courts/@${myPos[0]},${myPos[1]},13z`
+                        : `https://www.google.com/maps/search/pickleball+courts+near+me`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    height: 44, paddingInline: 14, borderRadius: 12,
+                    background: 'white', color: '#FF5C35',
+                    fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    textDecoration: 'none', flexShrink: 0,
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
+                  }}>
+                  Find Courts Now →
+                </a>
+              </div>
+            </div>
           </div>
-          <div className="courts-row">
-            {loading
-              ? <div className="spinner" style={{ margin: '4px 0' }} />
-              : filteredCourts.slice(0, 6).map(c => (
-                <div key={c.id} className="court-chip" onClick={() => setSelectedCourt(c)}>
-                  <div className="court-chip-name">{c.name}</div>
-                  <div className="court-chip-meta">
-                    {c.court_count ? `${c.court_count} courts` : 'Courts'}
-                    {c.distance_km != null ? ` · ${c.distance_km < 1 ? (c.distance_km * 1000).toFixed(0) + 'm' : c.distance_km.toFixed(1) + ' km'}` : c.city ? ` · ${c.city}` : ''}
+
+          {/* Official Court Directory card */}
+          <div style={{ padding: '12px 16px 4px' }}>
+            <div style={{
+              border: '1.5px solid var(--border)',
+              borderRadius: 18,
+              overflow: 'hidden',
+              background: 'white',
+            }}>
+              <div style={{
+                background: '#0a1628',
+                padding: '10px 16px',
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <div style={{ fontSize: 20 }}>🇺🇸</div>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: 1 }}>Official Court Directory</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: 'white', lineHeight: 1.2 }}>USA Pickleball — Places to Play</div>
+                </div>
+              </div>
+              <div style={{ padding: '14px 16px 16px' }}>
+                <div style={{
+                  background: '#f0fdf4', border: '1px solid #bbf7d0',
+                  borderRadius: 10, padding: '9px 12px', marginBottom: 12,
+                  display: 'flex', gap: 8, alignItems: 'flex-start',
+                }}>
+                  <span style={{ color: '#16a34a', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>✓</span>
+                  <div style={{ fontSize: 12, color: '#15803d', lineHeight: 1.5 }}>
+                    <strong>Official Source:</strong> Powered by USA Pickleball — the national governing body since 1984. All courts are verified and updated regularly.
                   </div>
                 </div>
-              ))
-            }
-            {!loading && filteredCourts.length === 0 && (
-              <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '4px 0' }}>No courts match your filters</div>
-            )}
+                <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 14 }}>
+                  Pickleheads is the official court and game finder of USA Pickleball, with new courts added daily. Find open play times, schedules, and locations near you.
+                </div>
+                <a
+                  href="https://www.pickleheads.com/courts"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    height: 44, borderRadius: 12, textDecoration: 'none',
+                    background: '#c0392b', color: 'white',
+                    fontSize: 13, fontWeight: 800, letterSpacing: 0.3,
+                  }}>
+                  FIND PICKLEBALL COURTS NEAR YOU
+                </a>
+              </div>
+            </div>
           </div>
 
           <div className="section-header">
