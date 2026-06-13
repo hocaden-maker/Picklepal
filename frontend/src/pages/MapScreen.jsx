@@ -129,46 +129,7 @@ function FilterSheet({ filters, onApply, onClose }) {
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 16px 4px' }}>
 
-          <div style={{ marginBottom: 22 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.9, marginBottom: 10 }}>
-              Show on Map
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <FilterChip label="🏓 Courts" active={local.showCourts} onClick={() => set('showCourts', !local.showCourts)} />
-              <FilterChip label="👥 Players" active={local.showPlayers} onClick={() => set('showPlayers', !local.showPlayers)} />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 22 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.9, marginBottom: 10 }}>
-              Court Access
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <FilterChip label="All" active={local.courtAccess === 'all'} onClick={() => set('courtAccess', 'all')} />
-              <FilterChip label="🟢 Free" active={local.courtAccess === 'public'} onClick={() => set('courtAccess', 'public')} />
-              <FilterChip label="💛 Pay-to-play" active={local.courtAccess === 'fee'} onClick={() => set('courtAccess', 'fee')} />
-              <FilterChip label="🟣 Members only" active={local.courtAccess === 'members'} onClick={() => set('courtAccess', 'members')} />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 22 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.9, marginBottom: 10 }}>
-              Player Skill Level
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {[
-                { v: 'all', label: 'Any' },
-                { v: 'beginner', label: 'Beginner' },
-                { v: 'intermediate', label: 'Intermediate' },
-                { v: 'advanced', label: 'Advanced' },
-                { v: 'expert', label: 'Expert' },
-              ].map(({ v, label }) => (
-                <FilterChip key={v} label={label} active={local.playerSkill === v} onClick={() => set('playerSkill', v)} />
-              ))}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 0', borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0 14px' }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 500 }}>Available to play only</div>
               <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Only show players who are free right now</div>
@@ -690,7 +651,7 @@ export default function MapScreen() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width={16} height={16}>
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <input placeholder="Search courts & players…" />
+          <input placeholder="Search players…" />
         </div>
         <button className="map-filter-btn" onClick={() => setShowFilters(true)} style={{ position: 'relative' }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
