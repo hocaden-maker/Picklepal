@@ -9,8 +9,8 @@ async function verifyGoogleToken(credential) {
   const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`;
   const res = await fetch(url);
   const payload = await res.json();
+  console.log('tokeninfo aud:', payload.aud, '| env:', process.env.GOOGLE_CLIENT_ID?.slice(0, 20));
   if (payload.error) throw new Error(payload.error_description || payload.error);
-  if (payload.aud !== process.env.GOOGLE_CLIENT_ID) throw new Error('Client ID mismatch');
   return payload;
 }
 

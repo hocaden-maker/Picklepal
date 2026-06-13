@@ -46,7 +46,7 @@ function LoginInner() {
         body: JSON.stringify({ credential: credentialResponse.credential }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.detail || data.error);
       login(data);
       navigate('/home');
     } catch (err) {
