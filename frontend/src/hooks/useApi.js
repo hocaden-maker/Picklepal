@@ -1,10 +1,14 @@
 import { useAuth } from '../context/AuthContext';
 
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
+
 export function useApi() {
   const { token } = useAuth();
 
   const request = async (path, options = {}) => {
-    const res = await fetch(`/api${path}`, {
+    const res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -19,7 +23,7 @@ export function useApi() {
   };
 
   const upload = async (path, formData) => {
-    const res = await fetch(`/api${path}`, {
+    const res = await fetch(`${API_BASE}${path}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: formData,

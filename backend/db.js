@@ -1,10 +1,12 @@
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
+const fs = require('fs');
 
 const db = new DatabaseSync(path.join(__dirname, 'rally.db'));
 db.exec('PRAGMA journal_mode = WAL');
 
 try { db.exec(`ALTER TABLE users ADD COLUMN cover_url TEXT DEFAULT ''`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN location_public INTEGER DEFAULT 0`); } catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -112,5 +114,25 @@ db.exec(`
     value TEXT
   );
 `);
+
+// Seed courts from bundled JSON if the table is empty (fresh deploy)
+try {
+  const count = db.prepare('SELECT COUNT(*) as c FROM courts_cache').get().c;
+  if (count === 0) {
+    const seedPath = path.join(__dirname, 'data', 'courts_seed.json');
+    if (fs.existsSync(seedPath)) {
+      const courts = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+      const stmt = db.prepare(
+        'INSERT OR IGNORE INTO courts_cache (id, name, lat, lon, city, court_count, access, surface, description) VALUES (?,?,?,?,?,?,?,?,?)'
+      );
+      let n = 0;
+      for (const c of courts) {
+        const id = 'seed_' + (++n);
+        stmt.run(id, c.name || '', c.lat || 0, c.lon || 0, c.city || '', c.court_count || 0, c.access || 'public', c.surface || '', c.description || '');
+      }
+      console.log(`Seeded ${n} courts from courts_seed.json`);
+    }
+  }
+} catch (e) { console.error('Seed error:', e.message); }
 
 module.exports = db;

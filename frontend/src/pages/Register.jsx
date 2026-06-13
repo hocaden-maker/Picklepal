@@ -4,6 +4,9 @@ import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
 const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced', 'expert'];
 
 const SKILL_META = {
@@ -26,7 +29,7 @@ function RegisterInner() {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -44,7 +47,7 @@ function RegisterInner() {
   const handleGoogleSuccess = async (credentialResponse) => {
     setError(''); setLoading(true);
     try {
-      const res = await fetch('/api/auth/google', {
+      const res = await fetch(`${API_BASE}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: credentialResponse.credential }),

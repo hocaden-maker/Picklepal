@@ -15,6 +15,9 @@ build/
 *.db-shm
 *.db-wal
 
+# Keep seed data
+!backend/data/courts_seed.json
+
 # Uploads
 backend/uploads/*
 !backend/uploads/.gitkeep
