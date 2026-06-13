@@ -159,7 +159,7 @@ export default function Profile() {
           <div style={{ padding: 16 }}>
             {[
               { label: 'Skill Level', value: user.skill_level, sub: 'Self-reported' },
-              { label: 'Total Games', value: (user.wins || 0) + (user.losses || 0), sub: 'All time' },
+              { label: 'Total Games', value: posts.filter(p => p.score?.trim()).length, sub: 'Posts with a score' },
             ].map(stat => (
               <div key={stat.label} style={{ background: 'var(--bg-2)', borderRadius: 'var(--radius)', padding: 14, marginBottom: 10 }}>
                 <div style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stat.label}</div>
