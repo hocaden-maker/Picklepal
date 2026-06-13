@@ -5,9 +5,6 @@ const fs = require('fs');
 const db = new Database(path.join(__dirname, 'rally.db'));
 db.pragma('journal_mode = WAL');
 
-try { db.exec(`ALTER TABLE users ADD COLUMN cover_url TEXT DEFAULT ''`); } catch {}
-try { db.exec(`ALTER TABLE users ADD COLUMN location_public INTEGER DEFAULT 0`); } catch {}
-
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -17,6 +14,7 @@ db.exec(`
     display_name TEXT DEFAULT '',
     bio TEXT DEFAULT '',
     avatar TEXT DEFAULT '',
+    cover_url TEXT DEFAULT '',
     location TEXT DEFAULT '',
     lat REAL DEFAULT 0,
     lng REAL DEFAULT 0,
@@ -30,6 +28,7 @@ db.exec(`
     following_count INTEGER DEFAULT 0,
     posts_count INTEGER DEFAULT 0,
     is_available INTEGER DEFAULT 0,
+    location_public INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -114,6 +113,10 @@ db.exec(`
     value TEXT
   );
 `);
+
+// Migrate existing DBs that predate cover_url / location_public columns
+try { db.exec(`ALTER TABLE users ADD COLUMN cover_url TEXT DEFAULT ''`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN location_public INTEGER DEFAULT 0`); } catch {}
 
 // Seed courts from bundled JSON if the table is empty (fresh deploy)
 try {
