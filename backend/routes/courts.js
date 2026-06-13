@@ -6,6 +6,25 @@ const { authenticate } = require('../middleware');
 const router = express.Router();
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+async function geocodeCourt(court) {
+  const q = [court.name, court.city].filter(Boolean).join(', ');
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=us`,
+      { headers: { 'User-Agent': 'PicklePal/1.0 (pickleball social app)' } }
+    );
+    const hits = await r.json();
+    if (hits[0]) {
+      db.prepare('UPDATE courts_cache SET lat = ?, lon = ?, geocoded = 1 WHERE id = ?')
+        .run(parseFloat(hits[0].lat), parseFloat(hits[0].lon), court.id);
+    } else {
+      db.prepare('UPDATE courts_cache SET geocoded = 1 WHERE id = ?').run(court.id);
+    }
+  } catch {
+    db.prepare('UPDATE courts_cache SET geocoded = 1 WHERE id = ?').run(court.id);
+  }
+}
+
 router.get('/', authenticate, async (req, res) => {
   const { lat, lon, q } = req.query;
 
@@ -34,7 +53,7 @@ router.get('/', authenticate, async (req, res) => {
             const elLon = el.lon ?? el.center?.lon;
             if (!elLat || !elLon) continue;
             const tags = el.tags || {};
-            db.prepare(`INSERT OR REPLACE INTO courts_cache (id, name, lat, lon, access, surface, indoor, address, city, lit, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            db.prepare(`INSERT OR REPLACE INTO courts_cache (id, name, lat, lon, access, surface, indoor, address, city, lit, description, geocoded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
               .run(id, tags.name || 'Pickleball Court', elLat, elLon, tags.access || 'public', tags.surface || '', tags.indoor === 'yes' ? 1 : 0, tags['addr:street'] || '', tags['addr:city'] || '', tags.lit === 'yes' ? 1 : 0, tags.description || '');
           }
           db.prepare('INSERT OR REPLACE INTO courts_meta (key, value) VALUES (?, ?)').run(`fetched_${cacheKey}`, Date.now().toString());
@@ -61,7 +80,19 @@ router.get('/', authenticate, async (req, res) => {
       return { ...c, distance_km: Math.sqrt(dlat * dlat + dlng * dlng) };
     }).sort((a, b) => a.distance_km - b.distance_km).slice(0, 150);
 
-    return res.json(withDist);
+    res.json(withDist);
+
+    // Background: geocode any seed courts that still have approximate coordinates
+    const needsGeocode = withDist.filter(c => !c.geocoded);
+    if (needsGeocode.length > 0) {
+      (async () => {
+        for (const court of needsGeocode.slice(0, 5)) {
+          await geocodeCourt(court);
+          await new Promise(r => setTimeout(r, 1200)); // respect Nominatim 1 req/sec limit
+        }
+      })();
+    }
+    return;
   }
 
   const courts = db.prepare('SELECT * FROM courts_cache ORDER BY name LIMIT 150').all();

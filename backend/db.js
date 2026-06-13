@@ -107,7 +107,8 @@ db.exec(`
     city TEXT DEFAULT '',
     lit INTEGER DEFAULT 0,
     description TEXT DEFAULT '',
-    court_count INTEGER DEFAULT 0
+    court_count INTEGER DEFAULT 0,
+    geocoded INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS courts_meta (
@@ -122,6 +123,8 @@ try { db.exec(`ALTER TABLE users ADD COLUMN location_public INTEGER DEFAULT 0`);
 // Migrate existing DBs that predate court_id / court_name on posts
 try { db.exec(`ALTER TABLE posts ADD COLUMN court_id TEXT DEFAULT NULL`); } catch {}
 try { db.exec(`ALTER TABLE posts ADD COLUMN court_name TEXT DEFAULT ''`); } catch {}
+// Migrate existing DBs that predate geocoded column on courts_cache
+try { db.exec(`ALTER TABLE courts_cache ADD COLUMN geocoded INTEGER DEFAULT 0`); } catch {}
 
 // Seed courts from bundled JSON if the table is empty (fresh deploy)
 try {
