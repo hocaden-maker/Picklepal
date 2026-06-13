@@ -7,6 +7,7 @@ const db = require('../db');
 const { authenticate, JWT_SECRET } = require('../middleware');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+console.log('Google Client ID loaded:', process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.slice(0, 20) + '...' : 'NOT SET');
 
 const router = express.Router();
 
@@ -77,7 +78,8 @@ router.post('/google', async (req, res) => {
     const safe = db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(user.id);
     res.json({ token, user: safe });
   } catch (err) {
-    res.status(401).json({ error: 'Invalid Google credential' });
+    console.error('Google auth error:', err.message);
+    res.status(401).json({ error: 'Invalid Google credential', detail: err.message });
   }
 });
 
