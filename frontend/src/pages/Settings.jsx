@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
+import TosModal from '../components/TosModal';
+import PrivacyModal from '../components/PrivacyModal';
 
 const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced', 'expert'];
 
@@ -89,6 +91,8 @@ export default function Settings() {
 
   const [showDeleteSheet, setShowDeleteSheet] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showTos, setShowTos] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
@@ -223,12 +227,15 @@ export default function Settings() {
 
         <Section title="About">
           <Row icon="📱" label="App Version" value="1.0.0" />
-          <Row icon="📋" label="Terms of Service" onClick={() => {}} />
-          <Row icon="🔐" label="Privacy Policy" onClick={() => {}} last />
+          <Row icon="📋" label="Terms of Service" onClick={() => setShowTos(true)} />
+          <Row icon="🔐" label="Privacy Policy" onClick={() => setShowPrivacy(true)} last />
         </Section>
 
         <div style={{ height: 24 }} />
       </div>
+
+      {showTos && <TosModal onClose={() => setShowTos(false)} />}
+      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
 
       {showDeleteSheet && (
         <div className="drawer-backdrop" onClick={() => setShowDeleteSheet(false)}>

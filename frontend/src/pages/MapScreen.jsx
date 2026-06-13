@@ -39,16 +39,19 @@ function timeAgo(dateStr) {
 }
 
 function playerIcon(player) {
-  const av = player.avatar || `https://i.pravatar.cc/56?u=${player.id}`;
+  const initials = (player.display_name || player.username || '?').slice(0, 2).toUpperCase();
   const dot = player.is_available
     ? `<div style="position:absolute;top:0;right:0;width:14px;height:14px;background:#22c55e;border-radius:50%;border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.2);"></div>`
     : '';
+  const inner = player.avatar
+    ? `<img src="${player.avatar}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='';this.style.display='none'" />`
+    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--brand,#f97316);color:white;font-weight:800;font-size:18px;font-family:sans-serif;">${initials}</div>`;
   return L.divIcon({
     className: '',
     html: `
       <div style="position:relative;display:flex;flex-direction:column;align-items:center;width:56px;">
         <div style="width:56px;height:56px;border-radius:50%;border:3px solid white;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.28);background:#eee;flex-shrink:0;position:relative;">
-          <img src="${av}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'" />
+          ${inner}
           ${dot}
         </div>
         <div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid white;margin-top:-1px;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.18));"></div>

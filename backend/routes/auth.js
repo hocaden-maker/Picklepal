@@ -28,9 +28,8 @@ router.post('/register', async (req, res) => {
     return res.status(409).json({ error: 'Username taken' });
   const id = uuidv4();
   const hashed = await bcrypt.hash(password, 10);
-  const avatar = `https://i.pravatar.cc/150?u=${id}`;
   db.prepare('INSERT INTO users (id, username, email, password, display_name, skill_level, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(id, username.toLowerCase(), email.toLowerCase(), hashed, display_name, skill_level || 'intermediate', avatar);
+    .run(id, username.toLowerCase(), email.toLowerCase(), hashed, display_name, skill_level || 'intermediate', '');
   const user = db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(id);
   const token = jwt.sign({ id }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ token, user });
@@ -73,7 +72,7 @@ router.post('/google', async (req, res) => {
         username = `${base}${n++}`;
       }
       db.prepare('INSERT INTO users (id, username, email, password, display_name, avatar, skill_level) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(id, username, email.toLowerCase(), '', name || username, picture || `https://i.pravatar.cc/150?u=${id}`, 'intermediate');
+        .run(id, username, email.toLowerCase(), '', name || username, picture || '', 'intermediate');
       user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     }
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });

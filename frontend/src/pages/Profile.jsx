@@ -5,64 +5,64 @@ import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import PostCard from '../components/PostCard';
 
-function DUPRModal({ current, onClose, onSave }) {
+function DUPRModal({ current, currentRating, onClose, onSave }) {
   const [duprId, setDuprId] = useState(current || '');
-  const [result, setResult] = useState(null);
+  const [duprRating, setDuprRating] = useState(currentRating > 0 ? String(currentRating) : '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const api = useApi();
 
-  const lookup = async () => {
-    if (!duprId.trim()) return;
-    setLoading(true); setError(''); setResult(null);
+  const save = async () => {
+    if (!duprId.trim()) { setError('Please enter your DUPR ID.'); return; }
+    const rating = parseFloat(duprRating);
+    if (isNaN(rating) || rating < 1.0 || rating > 8.0) {
+      setError('Rating must be between 1.0 and 8.0');
+      return;
+    }
+    setLoading(true); setError('');
     try {
-      const data = await api.get(`/dupr/lookup/${duprId.trim()}`);
-      setResult(data);
-    } catch (err) { setError(err.message); }
-    setLoading(false);
-  };
-
-  const connect = async () => {
-    setLoading(true);
-    try {
-      const data = await api.post('/dupr/connect', { dupr_id: duprId.trim() });
-      onSave(data.user);
+      const { user } = await api.post('/dupr/connect', { dupr_id: duprId.trim(), dupr_rating: rating });
+      onSave(user);
     } catch (err) { setError(err.message); }
     setLoading(false);
   };
 
   return (
     <div className="drawer-backdrop" onClick={onClose}>
-      <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '55vh' }}>
+      <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '60vh' }}>
         <div className="drawer-handle" />
-        <div className="drawer-title">Link DUPR Account</div>
-        <div className="drawer-body">
-          <p style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 16 }}>
-            Enter your DUPR Player ID to display your verified rating on your profile.
-            <br /><span style={{ fontSize: 12, color: 'var(--text-3)' }}>Try: 10001234 · 20005678 · 30009012</span>
+        <div className="drawer-title">Link DUPR Rating</div>
+        <div className="drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
+            Enter your DUPR ID and rating from{' '}
+            <strong>mydupr.com</strong> → Profile → Settings.
           </p>
-          <div className="field" style={{ marginBottom: 12 }}>
-            <span className="field-icon">🔢</span>
-            <input placeholder="DUPR Player ID" value={duprId} onChange={e => setDuprId(e.target.value)} />
-            <button className="btn btn-primary btn-xs" onClick={lookup} disabled={loading || !duprId.trim()}>
-              {loading ? '…' : 'Look Up'}
-            </button>
-          </div>
-          {error && <div className="auth-error" style={{ marginBottom: 12 }}>{error}</div>}
-          {result && (
-            <div style={{ background: 'var(--bg-2)', borderRadius: 'var(--radius)', padding: 14, marginBottom: 12 }}>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>{result.name}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>
-                {result.location} · Singles {result.singles?.toFixed(2)} · Doubles {result.doubles?.toFixed(2)}
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--brand)', marginTop: 6 }}>
-                {result.rating?.toFixed(3)}
-              </div>
-              <button className="btn btn-primary btn-sm" style={{ marginTop: 10, width: '100%' }} onClick={connect} disabled={loading}>
-                Connect This Account
-              </button>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>DUPR ID</div>
+            <div className="field">
+              <span className="field-icon">🔢</span>
+              <input placeholder="Your DUPR Player ID" value={duprId} onChange={e => setDuprId(e.target.value)} />
             </div>
-          )}
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>Your Rating</div>
+            <div className="field">
+              <span className="field-icon">🏅</span>
+              <input
+                type="number"
+                step="0.001"
+                min="1"
+                max="8"
+                placeholder="e.g. 4.215"
+                value={duprRating}
+                onChange={e => setDuprRating(e.target.value)}
+              />
+            </div>
+          </div>
+          {error && <div className="auth-error">{error}</div>}
+          <button className="btn btn-primary" onClick={save} disabled={loading || !duprId.trim() || !duprRating}>
+            {loading ? '…' : '🔗 Save DUPR Rating'}
+          </button>
         </div>
       </div>
     </div>
@@ -224,7 +224,10 @@ export default function Profile() {
               : <div className="posts-grid">
                   {posts.map(p => (
                     <div key={p.id} className="grid-item">
-                      <img src={p.image_url || `https://picsum.photos/seed/${p.id}/300/300`} alt="" loading="lazy" />
+                      {p.image_url
+                        ? <img src={p.image_url} alt="" loading="lazy" />
+                        : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>🏓</div>
+                      }
                       <div className="grid-overlay">
                         <span className="grid-overlay-count">
                           <svg viewBox="0 0 24 24" fill="white" width={12} height={12}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
@@ -256,7 +259,7 @@ export default function Profile() {
         <div style={{ height: 16 }} />
       </div>
 
-      {showDUPR && <DUPRModal current={user.dupr_id} onClose={() => setShowDUPR(false)} onSave={u => { updateUser(u); setShowDUPR(false); }} />}
+      {showDUPR && <DUPRModal current={user.dupr_id} currentRating={user.dupr_rating} onClose={() => setShowDUPR(false)} onSave={u => { updateUser(u); setShowDUPR(false); }} />}
     </div>
   );
 }
