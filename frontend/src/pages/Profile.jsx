@@ -5,178 +5,12 @@ import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import PostCard from '../components/PostCard';
 
-function DUPRModal({ onClose, onSave }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [allowed, setAllowed] = useState(false);
-  const [showPw, setShowPw] = useState(false);
-  const [step, setStep] = useState('login'); // login | loading | found | confirming
-  const [profile, setProfile] = useState(null);
-  const [error, setError] = useState('');
-  const api = useApi();
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    if (!allowed) { setError('Please check the permission box to continue.'); return; }
-    setStep('loading'); setError('');
-    try {
-      const p = await api.post('/dupr/auth', { email: email.trim(), password });
-      setProfile(p);
-      setStep('found');
-    } catch (err) {
-      setError(err.message || 'Could not connect to DUPR. Check your credentials and try again.');
-      setStep('login');
-    }
-  };
-
-  const handleConfirm = async () => {
-    if (!profile) return;
-    setStep('confirming');
-    try {
-      const { user } = await api.post('/dupr/connect', {
-        dupr_id: profile.id,
-        singles_rating: profile.singles,
-        doubles_rating: profile.doubles,
-      });
-      onSave(user);
-    } catch (err) {
-      setError(err.message || 'Failed to save. Please try again.');
-      setStep('found');
-    }
-  };
-
-  return (
-    <div className="drawer-backdrop" onClick={onClose}>
-      <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh' }}>
-        <div className="drawer-handle" />
-
-        {/* DUPR header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #14532d, #166534)',
-          margin: '-1px -1px 0', padding: '18px 20px 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: 'white', letterSpacing: '-0.5px', lineHeight: 1 }}>DUPR</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>Dynamic Universal Pickleball Rating</div>
-          </div>
-          {step === 'found' || step === 'confirming' ? (
-            <button onClick={() => { setStep('login'); setProfile(null); setError(''); }}
-              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', borderRadius: 8, padding: '5px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
-              ← Back
-            </button>
-          ) : null}
-        </div>
-
-        <div className="drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-          {/* ── Login form ── */}
-          {(step === 'login' || step === 'loading') && (
-            <>
-              <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
-                Log in with your DUPR account to sync your singles &amp; doubles ratings.
-              </p>
-              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div className="field">
-                  <span className="field-icon">✉️</span>
-                  <input type="email" placeholder="DUPR email" value={email}
-                    onChange={e => setEmail(e.target.value)} required autoComplete="email"
-                    disabled={step === 'loading'} />
-                </div>
-                <div className="field">
-                  <span className="field-icon">🔒</span>
-                  <input type={showPw ? 'text' : 'password'} placeholder="DUPR password"
-                    value={password} onChange={e => setPassword(e.target.value)}
-                    required autoComplete="current-password" disabled={step === 'loading'} />
-                  <button type="button" onClick={() => setShowPw(v => !v)}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer', flexShrink: 0, fontWeight: 600 }}>
-                    {showPw ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-
-                <label style={{
-                  display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer',
-                  background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 12px',
-                }}>
-                  <input type="checkbox" checked={allowed} onChange={e => setAllowed(e.target.checked)}
-                    style={{ width: 16, height: 16, marginTop: 1, accentColor: '#15803d', flexShrink: 0, cursor: 'pointer' }} />
-                  <span style={{ fontSize: 13, color: '#166534', lineHeight: 1.5 }}>
-                    Allow DUPR to create a new session with PicklePal and share my ratings.
-                  </span>
-                </label>
-
-                {error && <div className="auth-error">{error}</div>}
-
-                <button type="submit" disabled={step === 'loading' || !allowed || !email || !password}
-                  style={{
-                    height: 46, borderRadius: 12,
-                    background: !allowed ? '#86efac' : '#15803d',
-                    color: 'white', border: 'none', fontSize: 15, fontWeight: 700,
-                    cursor: step === 'loading' || !allowed ? 'not-allowed' : 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  }}>
-                  {step === 'loading'
-                    ? <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }} /> Connecting…</>
-                    : 'Log In to DUPR'}
-                </button>
-              </form>
-            </>
-          )}
-
-          {/* ── Confirmed profile ── */}
-          {(step === 'found' || step === 'confirming') && profile && (
-            <>
-              <div style={{
-                display: 'flex', gap: 12, alignItems: 'center',
-                background: '#f0fdf4', border: '1.5px solid #86efac',
-                borderRadius: 12, padding: '12px 14px',
-              }}>
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#dcfce7', border: '2px solid #86efac', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>✓</div>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: 15, color: '#14532d' }}>{profile.fullName}</div>
-                  {profile.location && <div style={{ fontSize: 12, color: '#16a34a' }}>📍 {profile.location}</div>}
-                  <div style={{ fontSize: 11, color: '#9ca3af' }}>DUPR ID: {profile.id}</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 10 }}>
-                {[['SINGLES', profile.singles, profile.singlesProvisional], ['DOUBLES', profile.doubles, profile.doublesProvisional]].map(([label, val, prov]) => (
-                  <div key={label} style={{ flex: 1, background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', letterSpacing: '0.05em', marginBottom: 3 }}>{label}</div>
-                    <div style={{ fontSize: 26, fontWeight: 900, color: '#15803d', lineHeight: 1 }}>{val != null ? val.toFixed(3) : '—'}</div>
-                    {prov && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>provisional</div>}
-                  </div>
-                ))}
-              </div>
-
-              {error && <div className="auth-error">{error}</div>}
-
-              <button onClick={handleConfirm} disabled={step === 'confirming'}
-                style={{
-                  height: 46, borderRadius: 12, background: '#15803d', color: 'white',
-                  border: 'none', fontSize: 15, fontWeight: 700,
-                  cursor: step === 'confirming' ? 'not-allowed' : 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}>
-                {step === 'confirming'
-                  ? <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }} /> Confirming…</>
-                  : '✓ Confirm Integration'}
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Profile() {
   const api = useApi();
   const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [tab, setTab] = useState('grid');
-  const [showDUPR, setShowDUPR] = useState(false);
   const [loading, setLoading] = useState(true);
   const [available, setAvailable] = useState(user?.is_available || false);
   const [coverUploading, setCoverUploading] = useState(false);
@@ -263,27 +97,6 @@ export default function Profile() {
           {user.bio && <div style={{ fontSize: 14, color: 'var(--text-2)', marginTop: 8, lineHeight: 1.5 }}>{user.bio}</div>}
         </div>
 
-        <div className="dupr-card" onClick={() => setShowDUPR(true)}>
-          <div className="dupr-card-logo">DUPR</div>
-          <div className="dupr-card-info" style={{ flex: 1 }}>
-            <div className="dupr-card-label">{user.dupr_verified ? 'Verified Rating' : 'Link DUPR Account'}</div>
-            {user.dupr_verified
-              ? <div style={{ display: 'flex', gap: 14, marginTop: 2 }}>
-                  <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600 }}>SINGLES</div>
-                    <div className="dupr-card-rating" style={{ lineHeight: 1 }}>{(user.singles_rating > 0 ? user.singles_rating : user.dupr_rating)?.toFixed(3)}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600 }}>DOUBLES</div>
-                    <div className="dupr-card-rating" style={{ lineHeight: 1 }}>{(user.doubles_rating > 0 ? user.doubles_rating : user.dupr_rating)?.toFixed(3)}</div>
-                  </div>
-                </div>
-              : <div className="dupr-card-rating" style={{ fontSize: 15, color: 'var(--text-2)' }}>Tap to connect your rating</div>
-            }
-          </div>
-          <div className="dupr-card-arrow">›</div>
-        </div>
-
         <div className="profile-stats-row">
           <div className="profile-stat">
             <div className="profile-stat-val">{user.posts_count || posts.length}</div>
@@ -345,7 +158,6 @@ export default function Profile() {
         {tab === 'stats' && (
           <div style={{ padding: 16 }}>
             {[
-              { label: 'DUPR Rating', value: user.dupr_verified ? user.dupr_rating?.toFixed(3) : 'Not linked', sub: user.dupr_verified ? '✓ Verified' : 'Link your account' },
               { label: 'Skill Level', value: user.skill_level, sub: 'Self-reported' },
               { label: 'Total Games', value: (user.wins || 0) + (user.losses || 0), sub: 'All time' },
             ].map(stat => (
@@ -361,7 +173,6 @@ export default function Profile() {
         <div style={{ height: 16 }} />
       </div>
 
-      {showDUPR && <DUPRModal current={user.dupr_id} onClose={() => setShowDUPR(false)} onSave={u => { updateUser(u); setShowDUPR(false); }} />}
     </div>
   );
 }
