@@ -139,9 +139,24 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS thread_likes (
     user_id TEXT NOT NULL,
     thread_id TEXT NOT NULL,
+    vote TEXT DEFAULT 'like',
     PRIMARY KEY (user_id, thread_id)
   );
+
+  CREATE TABLE IF NOT EXISTS reply_votes (
+    user_id TEXT NOT NULL,
+    reply_id TEXT NOT NULL,
+    vote TEXT NOT NULL,
+    PRIMARY KEY (user_id, reply_id)
+  );
 `);
+
+// Migrate existing DBs that predate parent_id on thread_replies
+try { db.exec(`ALTER TABLE thread_replies ADD COLUMN parent_id TEXT DEFAULT NULL`); } catch {}
+// Migrate for like/dislike support
+try { db.exec(`ALTER TABLE threads ADD COLUMN dislike_count INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE thread_replies ADD COLUMN dislike_count INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE thread_likes ADD COLUMN vote TEXT DEFAULT 'like'`); } catch {}
 
 // Migrate existing DBs that predate cover_url / location_public columns
 try { db.exec(`ALTER TABLE users ADD COLUMN cover_url TEXT DEFAULT ''`); } catch {}
