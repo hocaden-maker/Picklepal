@@ -79,7 +79,6 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const [showLocation, setShowLocation] = useState(true);
   const [available, setAvailable] = useState(!!user?.is_available);
   const [notifs, setNotifs] = useState({ followers: true, invites: true, comments: true, messages: true });
 
@@ -190,7 +189,6 @@ export default function Settings() {
         </Section>
 
         <Section title="Privacy">
-          <ToggleRow icon="📍" label="Show me on the map" subtitle="Other players can see your location" on={showLocation} onChange={setShowLocation} />
           <ToggleRow icon="🟢" label="Available to play" subtitle="Appear as available to other players" on={available} onChange={toggleAvailable} last />
         </Section>
 
