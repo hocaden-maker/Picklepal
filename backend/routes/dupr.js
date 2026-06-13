@@ -4,7 +4,7 @@ const { authenticate } = require('../middleware');
 
 const router = express.Router();
 
-const DUPR_API = 'https://api.mydupr.com';
+const DUPR_API = 'https://api.dupr.gg';
 const SAFE = 'id, username, email, display_name, bio, avatar, cover_url, location, lat, lng, skill_level, dupr_id, dupr_rating, singles_rating, doubles_rating, dupr_verified, wins, losses, followers_count, following_count, posts_count, is_available';
 
 function decodeJwtPayload(token) {
@@ -17,15 +17,17 @@ function decodeJwtPayload(token) {
 
 function formatPlayer(p) {
   if (!p) throw new Error('Empty DUPR player response');
+  const singles = p.ratings?.singles ?? p.ratings?.provisionalRatings?.singlesRating ?? null;
+  const doubles = p.ratings?.doubles ?? p.ratings?.provisionalRatings?.doublesRating ?? null;
   return {
     id: p.id,
     fullName: p.fullName || p.displayName || '',
     imageUrl: p.imageUrl || null,
     location: p.address || p.location || '',
-    singles: p.ratings?.singles?.rating ?? null,
-    singlesProvisional: p.ratings?.singles?.provisional ?? false,
-    doubles: p.ratings?.doubles?.rating ?? null,
-    doublesProvisional: p.ratings?.doubles?.provisional ?? false,
+    singles: typeof singles === 'number' ? singles : null,
+    singlesProvisional: !p.ratings?.singles && !!(p.ratings?.provisionalRatings?.singlesRating),
+    doubles: typeof doubles === 'number' ? doubles : null,
+    doublesProvisional: !p.ratings?.doubles && !!(p.ratings?.provisionalRatings?.doublesRating),
   };
 }
 
@@ -41,7 +43,7 @@ router.post('/auth', authenticate, async (req, res) => {
     const authRes = await fetch(`${DUPR_API}/auth/v1.0/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emailAddress: email, password }),
+      body: JSON.stringify({ email, password }),
     });
 
     if (!authRes.ok) {
@@ -100,15 +102,15 @@ router.post('/connect', authenticate, (req, res) => {
   const { dupr_id, singles_rating, doubles_rating } = req.body;
   if (!dupr_id) return res.status(400).json({ error: 'DUPR ID is required' });
 
-  const singles = parseFloat(singles_rating);
-  const doubles = parseFloat(doubles_rating);
+  const singles = singles_rating != null ? parseFloat(singles_rating) : null;
+  const doubles = doubles_rating != null ? parseFloat(doubles_rating) : null;
 
-  if (isNaN(singles) || singles < 1.0 || singles > 8.0)
+  if (singles !== null && (isNaN(singles) || singles < 1.0 || singles > 8.0))
     return res.status(400).json({ error: 'Singles rating must be between 1.0 and 8.0' });
-  if (isNaN(doubles) || doubles < 1.0 || doubles > 8.0)
+  if (doubles !== null && (isNaN(doubles) || doubles < 1.0 || doubles > 8.0))
     return res.status(400).json({ error: 'Doubles rating must be between 1.0 and 8.0' });
 
-  const primary = Math.max(singles, doubles);
+  const primary = Math.max(singles ?? 0, doubles ?? 0);
 
   db.prepare(`UPDATE users SET
     dupr_id = ?, dupr_rating = ?, singles_rating = ?, doubles_rating = ?, dupr_verified = 1
