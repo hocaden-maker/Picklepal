@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
@@ -39,27 +39,22 @@ function timeAgo(dateStr) {
 }
 
 function playerIcon(player) {
+  const av = player.avatar || `https://i.pravatar.cc/56?u=${player.id}`;
+  const dot = player.is_available
+    ? `<div style="position:absolute;top:0;right:0;width:14px;height:14px;background:#22c55e;border-radius:50%;border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.2);"></div>`
+    : '';
   return L.divIcon({
     className: '',
-    html: `<div style="width:44px;height:44px;border-radius:50%;padding:2.5px;background:linear-gradient(135deg,#FF5C35,#FF9A00);box-shadow:0 2px 10px rgba(255,92,53,0.5);">
-      <div style="width:100%;height:100%;border-radius:50%;border:2px solid white;overflow:hidden;background:#f5f5f5;">
-        <img src="${player.avatar || `https://i.pravatar.cc/44?u=${player.id}`}" style="width:100%;height:100%;object-fit:cover;" />
-      </div>
-    </div>
-    <div style="position:absolute;bottom:-1px;right:-1px;background:#FF5C35;color:white;font-size:9px;font-weight:800;border-radius:6px;padding:1px 4px;border:1.5px solid white;">${player.dupr_rating?.toFixed(1) || '?'}</div>`,
-    iconSize: [44, 44],
-    iconAnchor: [22, 22],
-  });
-}
-
-function courtIcon() {
-  return L.divIcon({
-    className: '',
-    html: `<div style="width:34px;height:34px;background:#FF5C35;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(255,92,53,0.5);display:flex;align-items:center;justify-content:center;">
-      <span style="transform:rotate(45deg);font-size:14px;">🏓</span>
-    </div>`,
-    iconSize: [34, 34],
-    iconAnchor: [10, 34],
+    html: `
+      <div style="position:relative;display:flex;flex-direction:column;align-items:center;width:56px;">
+        <div style="width:56px;height:56px;border-radius:50%;border:3px solid white;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.28);background:#eee;flex-shrink:0;position:relative;">
+          <img src="${av}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'" />
+          ${dot}
+        </div>
+        <div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid white;margin-top:-1px;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.18));"></div>
+      </div>`,
+    iconSize: [56, 68],
+    iconAnchor: [28, 68],
   });
 }
 
@@ -258,53 +253,103 @@ function LocationShareModal({ onShare, onDecline }) {
   );
 }
 
-function PlayerProfileModal({ player, onClose }) {
+function PlayerProfileModal({ player, onClose, onFlyTo }) {
   const navigate = useNavigate();
+  const api = useApi();
   const skillColor = { beginner: '#22c55e', intermediate: '#3b82f6', advanced: '#f59e0b', expert: '#ef4444' };
   const col = skillColor[player.skill_level] || '#6b7280';
+
   return (
     <div className="drawer-backdrop" onClick={onClose}>
-      <div className="drawer" onClick={e => e.stopPropagation()}
-        style={{ paddingBottom: 32 }}>
+      <div className="drawer" onClick={e => e.stopPropagation()} style={{ paddingBottom: 32 }}>
         <div className="drawer-handle" />
         <div style={{ padding: '8px 20px 20px' }}>
-          <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16 }}>
-            <img src={player.avatar} alt="" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--brand)', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>{player.display_name}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 2 }}>@{player.username}</div>
-              <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                {player.dupr_rating > 0 && (
-                  <span style={{ fontSize: 12, fontWeight: 700, background: '#fff7ed', color: '#c2410c', padding: '2px 8px', borderRadius: 8, border: '1px solid #fed7aa' }}>
-                    DUPR {player.dupr_rating.toFixed(2)}
-                  </span>
-                )}
-                <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 8, background: col + '18', color: col, border: `1px solid ${col}44`, textTransform: 'capitalize' }}>
-                  {player.skill_level}
-                </span>
-                {player.is_available ? (
-                  <span style={{ fontSize: 12, fontWeight: 700, background: '#ecfdf5', color: '#16a34a', padding: '2px 8px', borderRadius: 8, border: '1px solid #bbf7d0' }}>● Available</span>
-                ) : null}
-              </div>
+
+          {/* Profile picture + name centered, Snapchat-style */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{
+              width: 82, height: 82, borderRadius: '50%',
+              border: '3.5px solid white',
+              overflow: 'hidden', marginBottom: 10,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+              position: 'relative',
+            }}>
+              <img src={player.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {player.is_available && (
+                <div style={{ position: 'absolute', bottom: 4, right: 4, width: 14, height: 14, background: '#22c55e', borderRadius: '50%', border: '2px solid white' }} />
+              )}
+            </div>
+            <div style={{ fontSize: 19, fontWeight: 800, lineHeight: 1.2 }}>{player.display_name}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 2 }}>@{player.username}</div>
+
+            {/* Live location badge */}
+            <div style={{
+              marginTop: 10, display: 'flex', alignItems: 'center', gap: 6,
+              background: 'var(--surface)', borderRadius: 20, padding: '5px 14px',
+              fontSize: 12, color: 'var(--text-2)', fontWeight: 600,
+            }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#FF5C35', display: 'inline-block', boxShadow: '0 0 0 3px rgba(255,92,53,0.2)' }} />
+              Live location · {player.location || 'Nearby'}
+              {onFlyTo && (
+                <button onClick={onFlyTo} style={{
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  fontSize: 14, marginLeft: 2,
+                }}>🗺️</button>
+              )}
             </div>
           </div>
-          {player.bio && <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 16, background: 'var(--surface)', borderRadius: 10, padding: '10px 12px' }}>{player.bio}</div>}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <div style={{ textAlign: 'center', background: 'var(--surface)', borderRadius: 10, padding: '10px 0' }}>
-              <div style={{ fontSize: 20, fontWeight: 800 }}>{player.wins || 0}</div>
+
+          {/* Badges */}
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+            {player.dupr_rating > 0 && (
+              <span style={{ fontSize: 12, fontWeight: 700, background: '#fff7ed', color: '#c2410c', padding: '3px 10px', borderRadius: 10, border: '1px solid #fed7aa' }}>
+                DUPR {player.dupr_rating.toFixed(2)}
+              </span>
+            )}
+            <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 10, background: col + '18', color: col, border: `1px solid ${col}44`, textTransform: 'capitalize' }}>
+              {player.skill_level}
+            </span>
+            {player.is_available && (
+              <span style={{ fontSize: 12, fontWeight: 700, background: '#ecfdf5', color: '#16a34a', padding: '3px 10px', borderRadius: 10, border: '1px solid #bbf7d0' }}>● Available now</span>
+            )}
+          </div>
+
+          {player.bio && (
+            <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 14, background: 'var(--surface)', borderRadius: 12, padding: '10px 14px', textAlign: 'center' }}>
+              {player.bio}
+            </div>
+          )}
+
+          {/* Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+            <div style={{ textAlign: 'center', background: 'var(--surface)', borderRadius: 12, padding: '12px 0' }}>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>{player.wins || 0}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>Wins</div>
             </div>
-            <div style={{ textAlign: 'center', background: 'var(--surface)', borderRadius: 10, padding: '10px 0' }}>
-              <div style={{ fontSize: 20, fontWeight: 800 }}>{player.followers_count || 0}</div>
+            <div style={{ textAlign: 'center', background: 'var(--surface)', borderRadius: 12, padding: '12px 0' }}>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>{player.followers_count || 0}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>Followers</div>
             </div>
           </div>
-          <button
-            className="btn btn-primary"
-            style={{ width: '100%', height: 48, fontSize: 15, fontWeight: 700, marginTop: 14, borderRadius: 12 }}
-            onClick={() => { onClose(); navigate(`/u/${player.username}`); }}>
-            View Full Profile
-          </button>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn-secondary"
+              style={{ flex: 1, height: 48, fontSize: 14, fontWeight: 700, borderRadius: 12 }}
+              onClick={() => {
+                api.post('/invites', { receiver_id: player.id }).catch(() => {});
+                onClose();
+              }}>
+              🏓 Invite
+            </button>
+            <button
+              className="btn btn-primary"
+              style={{ flex: 1, height: 48, fontSize: 14, fontWeight: 700, borderRadius: 12 }}
+              onClick={() => { onClose(); navigate(`/u/${player.username}`); }}>
+              View Profile
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -626,23 +671,7 @@ export default function MapScreen() {
         {myPos && <Marker position={myPos} icon={meIcon()} />}
         {filters.showPlayers && filteredPlayers.map(p => (
           <Marker key={p.id} position={[p.lat, p.lng]} icon={playerIcon(p)}
-            eventHandlers={{ click: () => setSelectedPlayer(p) }}>
-            <Popup>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 170 }}>
-                <img src={p.avatar} width={38} height={38} style={{ borderRadius: '50%', objectFit: 'cover', border: '2px solid #FF5C35', flexShrink: 0 }} alt="" />
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{p.display_name}</div>
-                  <div style={{ fontSize: 11, color: '#666', marginTop: 1 }}>@{p.username}</div>
-                  {p.dupr_rating > 0 && <div style={{ fontSize: 11, color: '#c2410c', fontWeight: 600 }}>DUPR {p.dupr_rating.toFixed(2)}</div>}
-                  {p.is_available && <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>● Available to play</div>}
-                </div>
-              </div>
-              <button onClick={() => { setSelectedPlayer(p); }}
-                style={{ marginTop: 8, width: '100%', background: '#FF5C35', color: 'white', border: 'none', borderRadius: 8, padding: '7px 0', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                View Profile
-              </button>
-            </Popup>
-          </Marker>
+            eventHandlers={{ click: () => setSelectedPlayer(p) }} />
         ))}
       </MapContainer>
 
@@ -839,7 +868,16 @@ export default function MapScreen() {
         <FilterSheet filters={filters} onApply={setFilters} onClose={() => setShowFilters(false)} />
       )}
       {selectedPlayer && (
-        <PlayerProfileModal player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />
+        <PlayerProfileModal
+          player={selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+          onFlyTo={() => {
+            if (mapRef.current && selectedPlayer.lat && selectedPlayer.lng) {
+              mapRef.current.flyTo([selectedPlayer.lat, selectedPlayer.lng], 16, { duration: 1 });
+            }
+            setSelectedPlayer(null);
+          }}
+        />
       )}
     </div>
   );
