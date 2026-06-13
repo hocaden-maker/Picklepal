@@ -1,9 +1,9 @@
-const { DatabaseSync } = require('node:sqlite');
+const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-const db = new DatabaseSync(path.join(__dirname, 'rally.db'));
-db.exec('PRAGMA journal_mode = WAL');
+const db = new Database(path.join(__dirname, 'rally.db'));
+db.pragma('journal_mode = WAL');
 
 try { db.exec(`ALTER TABLE users ADD COLUMN cover_url TEXT DEFAULT ''`); } catch {}
 try { db.exec(`ALTER TABLE users ADD COLUMN location_public INTEGER DEFAULT 0`); } catch {}
