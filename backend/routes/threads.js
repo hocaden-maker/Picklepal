@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { authenticate } = require('../middleware');
+const { authenticate, optionalAuth } = require('../middleware');
 const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
@@ -10,7 +10,7 @@ const WITH_USER = `t.*, u.username, u.display_name, u.avatar`;
 const REPLY_WITH_USER = `r.*, u.username, u.display_name, u.avatar`;
 
 // GET /threads?category=pro&offset=0
-router.get('/', authenticate, (req, res) => {
+router.get('/', optionalAuth, (req, res) => {
   const { category, offset = 0 } = req.query;
   if (!CATEGORIES.includes(category)) return res.status(400).json({ error: 'Invalid category' });
   const threads = db.prepare(`
@@ -37,7 +37,7 @@ router.post('/', authenticate, (req, res) => {
 });
 
 // GET /threads/:id (thread + all replies)
-router.get('/:id', authenticate, (req, res) => {
+router.get('/:id', optionalAuth, (req, res) => {
   const thread = db.prepare(`SELECT ${WITH_USER} FROM threads t JOIN users u ON t.user_id = u.id WHERE t.id = ?`).get(req.params.id);
   if (!thread) return res.status(404).json({ error: 'Thread not found' });
   const replies = db.prepare(`
@@ -46,7 +46,9 @@ router.get('/:id', authenticate, (req, res) => {
     WHERE r.thread_id = ?
     ORDER BY r.created_at ASC
   `).all(req.params.id);
-  const liked = !!db.prepare('SELECT 1 FROM thread_likes WHERE user_id = ? AND thread_id = ?').get(req.user.id, req.params.id);
+  const liked = req.user
+    ? !!db.prepare('SELECT 1 FROM thread_likes WHERE user_id = ? AND thread_id = ?').get(req.user.id, req.params.id)
+    : false;
   res.json({ ...thread, replies, liked });
 });
 

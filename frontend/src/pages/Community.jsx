@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
+
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
 
 const CATEGORIES = [
   { key: 'pro', label: 'Pro Pickleball', emoji: '🏆' },
@@ -116,6 +121,7 @@ function NewThreadDrawer({ defaultCategory, onClose, onCreated }) {
 function ThreadDetail({ thread: initial, onBack }) {
   const api = useApi();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [thread, setThread] = useState(initial);
   const [replies, setReplies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,7 +131,11 @@ function ThreadDetail({ thread: initial, onBack }) {
   const bottomRef = useRef();
 
   useEffect(() => {
-    api.get(`/threads/${thread.id}`)
+    const token = localStorage.getItem('pp_token');
+    fetch(`${API_BASE}/threads/${thread.id}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.json())
       .then(data => {
         setThread(data);
         setReplies(data.replies || []);
@@ -191,7 +201,7 @@ function ThreadDetail({ thread: initial, onBack }) {
 
           {/* Actions */}
           <div style={{ display: 'flex', gap: 16, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
-            <button onClick={toggleLike} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', color: liked ? 'var(--brand)' : 'var(--text-3)', fontWeight: 600, fontSize: 13, padding: 0 }}>
+            <button onClick={user ? toggleLike : () => navigate('/login')} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', color: liked ? 'var(--brand)' : 'var(--text-3)', fontWeight: 600, fontSize: 13, padding: 0 }}>
               <svg viewBox="0 0 24 24" width={16} height={16} fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
               </svg>
@@ -232,23 +242,33 @@ function ThreadDetail({ thread: initial, onBack }) {
       </div>
 
       {/* Reply input — pinned to bottom */}
-      <form onSubmit={submitReply} style={{ position: 'fixed', bottom: 'var(--tab-h,60px)', left: 0, right: 0, background: 'white', borderTop: '1px solid var(--border)', padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'flex-end', zIndex: 50 }}>
-        <Avatar user={user} size={32} />
-        <div style={{ flex: 1, position: 'relative' }}>
-          <textarea
-            value={reply}
-            onChange={e => setReply(e.target.value)}
-            placeholder="Write a reply…"
-            rows={1}
-            style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--border)', borderRadius: 20, padding: '8px 44px 8px 14px', fontSize: 14, outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.4, maxHeight: 100, overflowY: 'auto' }}
-            onInput={e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px'; }}
-          />
-          <button type="submit" disabled={posting || !reply.trim()}
-            style={{ position: 'absolute', right: 8, bottom: 7, width: 28, height: 28, borderRadius: '50%', background: reply.trim() ? 'var(--brand)' : 'var(--border)', border: 'none', cursor: reply.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          </button>
+      {user ? (
+        <form onSubmit={submitReply} style={{ position: 'fixed', bottom: 'var(--tab-h,60px)', left: 0, right: 0, background: 'white', borderTop: '1px solid var(--border)', padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'flex-end', zIndex: 50 }}>
+          <Avatar user={user} size={32} />
+          <div style={{ flex: 1, position: 'relative' }}>
+            <textarea
+              value={reply}
+              onChange={e => setReply(e.target.value)}
+              placeholder="Write a reply…"
+              rows={1}
+              style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--border)', borderRadius: 20, padding: '8px 44px 8px 14px', fontSize: 14, outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.4, maxHeight: 100, overflowY: 'auto' }}
+              onInput={e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px'; }}
+            />
+            <button type="submit" disabled={posting || !reply.trim()}
+              style={{ position: 'absolute', right: 8, bottom: 7, width: 28, height: 28, borderRadius: '50%', background: reply.trim() ? 'var(--brand)' : 'var(--border)', border: 'none', cursor: reply.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div style={{ position: 'fixed', bottom: 'var(--tab-h,60px)', left: 0, right: 0, background: 'white', borderTop: '1px solid var(--border)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, zIndex: 50 }}>
+          <span style={{ fontSize: 14, color: 'var(--text-3)' }}>Join the conversation</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link to="/login" style={{ padding: '8px 16px', borderRadius: 20, border: '1.5px solid var(--border)', fontSize: 13, fontWeight: 700, color: 'var(--ink)', textDecoration: 'none' }}>Log in</Link>
+            <Link to="/register" style={{ padding: '8px 16px', borderRadius: 20, background: 'var(--brand)', fontSize: 13, fontWeight: 700, color: 'white', textDecoration: 'none' }}>Sign up</Link>
+          </div>
         </div>
-      </form>
+      )}
     </div>
   );
 }
@@ -284,7 +304,8 @@ function ThreadCard({ thread, onClick }) {
 
 // ── Main Community Page ───────────────────────────────────────────────────────
 export default function Community() {
-  const api = useApi();
+  const { user } = useAuth(); // may be null for public visitors
+  const navigate = useNavigate();
   const [category, setCategory] = useState('pro');
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -293,11 +314,20 @@ export default function Community() {
 
   useEffect(() => {
     setLoading(true);
-    api.get(`/threads?category=${category}`)
+    const token = localStorage.getItem('pp_token');
+    fetch(`${API_BASE}/threads?category=${category}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.json())
       .then(setThreads)
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [category]);
+
+  const handleNewThread = () => {
+    if (!user) { navigate('/login'); return; }
+    setShowNew(true);
+  };
 
   const handleCreated = (thread) => {
     setShowNew(false);
@@ -322,7 +352,7 @@ export default function Community() {
         <div style={{ flex: 1, fontSize: 18, fontWeight: 900, letterSpacing: '-0.5px' }}>
           Community
         </div>
-        <button onClick={() => setShowNew(true)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 20, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={handleNewThread} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 20, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
           <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           New Thread
         </button>
@@ -355,7 +385,7 @@ export default function Community() {
                 <div className="empty-icon">💬</div>
                 <div className="empty-title">No threads yet</div>
                 <div className="empty-body">Start the conversation — be the first to post!</div>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowNew(true)}>New Thread</button>
+                <button className="btn btn-primary btn-sm" onClick={handleNewThread}>New Thread</button>
               </div>
             )
             : threads.map(t => (

@@ -86,7 +86,7 @@ function AppRoutes() {
         <Route path="/messages" element={<ProtectedRoute><MessagesList /></ProtectedRoute>} />
         <Route path="/messages/:userId" element={<ProtectedRoute><ChatView /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
+        <Route path="/community" element={<Community />} />
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
       <TabBar />

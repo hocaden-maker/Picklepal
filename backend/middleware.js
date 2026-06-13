@@ -12,4 +12,11 @@ function authenticate(req, res, next) {
   }
 }
 
-module.exports = { authenticate, JWT_SECRET };
+function optionalAuth(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) return next();
+  try { req.user = jwt.verify(auth.slice(7), JWT_SECRET); } catch {}
+  next();
+}
+
+module.exports = { authenticate, optionalAuth, JWT_SECRET };
