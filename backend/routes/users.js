@@ -44,6 +44,24 @@ router.get('/search', authenticate, async (req, res) => {
   res.json(users);
 });
 
+router.get('/me/followers', authenticate, async (req, res) => {
+  const followers = await db.prepare(`
+    SELECT ${PUB} FROM users
+    WHERE id IN (SELECT follower_id FROM follows WHERE following_id = ?)
+    ORDER BY display_name ASC
+  `).all(req.user.id);
+  res.json(followers);
+});
+
+router.get('/me/following', authenticate, async (req, res) => {
+  const following = await db.prepare(`
+    SELECT ${PUB} FROM users
+    WHERE id IN (SELECT following_id FROM follows WHERE follower_id = ?)
+    ORDER BY display_name ASC
+  `).all(req.user.id);
+  res.json(following);
+});
+
 router.get('/:username', authenticate, async (req, res) => {
   const user = await db.prepare(`SELECT ${PUB} FROM users WHERE username = ?`).get(req.params.username);
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -86,6 +104,14 @@ router.put('/me', authenticate, async (req, res) => {
     .run(display_name ?? null, bio ?? null, location ?? null, lat ?? null, lng ?? null, skill_level ?? null, avatar ?? null, cover_url ?? null, is_available ?? null, location_public ?? null, req.user.id);
   const user = await db.prepare(`SELECT ${PUB} FROM users WHERE id = ?`).get(req.user.id);
   res.json(user);
+});
+
+router.delete('/me/followers/:userId', authenticate, async (req, res) => {
+  const { userId } = req.params;
+  await db.prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?').run(userId, req.user.id);
+  await db.prepare('UPDATE users SET followers_count = GREATEST(0, followers_count - 1) WHERE id = ?').run(req.user.id);
+  await db.prepare('UPDATE users SET following_count = GREATEST(0, following_count - 1) WHERE id = ?').run(userId);
+  res.json({ success: true });
 });
 
 router.delete('/me', authenticate, async (req, res) => {
