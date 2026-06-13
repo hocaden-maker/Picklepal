@@ -15,9 +15,10 @@ export default function Profile() {
   const [available, setAvailable] = useState(user?.is_available || false);
   const [coverUploading, setCoverUploading] = useState(false);
   const coverRef = useRef();
-  const [followSheet, setFollowSheet] = useState(null); // 'followers' | 'following' | null
+  const [followSheet, setFollowSheet] = useState(null);
   const [followList, setFollowList] = useState([]);
   const [followLoading, setFollowLoading] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
 
   useEffect(() => {
     if (!user) return;
@@ -169,7 +170,7 @@ export default function Profile() {
               ? <div className="empty-state"><div className="empty-icon">📸</div><div className="empty-title">No posts yet</div><div className="empty-body">Share your first pickleball highlight!</div><button className="btn btn-primary btn-sm" onClick={() => navigate('/create')}>Create Post</button></div>
               : <div className="posts-grid">
                   {posts.map(p => (
-                    <div key={p.id} className="grid-item">
+                    <div key={p.id} className="grid-item" onClick={() => setSelectedPost(p)} style={{ cursor: 'pointer' }}>
                       {p.image_url
                         ? <img src={p.image_url} alt="" loading="lazy" />
                         : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>🏓</div>
@@ -202,6 +203,27 @@ export default function Profile() {
 
         <div style={{ height: 16 }} />
       </div>
+
+      {selectedPost && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+          <div className="top-nav" style={{ borderBottom: '1px solid var(--border)' }}>
+            <button className="back-btn" onClick={() => setSelectedPost(null)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div style={{ flex: 1, fontSize: 16, fontWeight: 800, textAlign: 'center' }}>Post</div>
+            <div style={{ width: 40 }} />
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <PostCard
+              post={selectedPost}
+              onDelete={(id) => {
+                setPosts(prev => prev.filter(p => p.id !== id));
+                setSelectedPost(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {followSheet && (
         <div className="drawer-backdrop" onClick={() => setFollowSheet(null)}>
