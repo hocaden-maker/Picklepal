@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import TosModal from '../components/TosModal';
 import PrivacyModal from '../components/PrivacyModal';
+import CropModal from '../components/CropModal';
 
 const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced', 'expert'];
 
@@ -78,6 +79,10 @@ export default function Settings() {
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [cropState, setCropState] = useState(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const avatarInputRef = useRef(null);
+  const coverInputRef = useRef(null);
 
   const [available, setAvailable] = useState(!!user?.is_available);
   const [notifs, setNotifs] = useState({ followers: true, invites: true, comments: true, messages: true });
@@ -94,6 +99,27 @@ export default function Settings() {
   const [showPrivacy, setShowPrivacy] = useState(false);
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const pickPhoto = (field, aspect, circular, title) => e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setCropState({ file, field, aspect, circular, title });
+  };
+
+  const handleCropDone = async (blob) => {
+    const { field } = cropState;
+    setCropState(null);
+    setPhotoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('image', blob, 'photo.jpg');
+      const { url } = await api.upload('/upload', fd);
+      const updated = await api.put('/users/me', { [field]: url });
+      updateUser(updated);
+    } catch {}
+    setPhotoUploading(false);
+  };
 
   const save = async () => {
     setSaving(true);
@@ -150,10 +176,40 @@ export default function Settings() {
       </div>
 
       <div className="page">
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 12px' }}>
-          <Avatar user={user} size={72} />
-          <div style={{ marginTop: 8, fontSize: 13, color: 'var(--brand)', fontWeight: 600, cursor: 'pointer' }}>Change Photo</div>
+        {/* Cover photo */}
+        <div
+          onClick={() => coverInputRef.current.click()}
+          style={{
+            position: 'relative', height: 108, cursor: 'pointer', overflow: 'hidden',
+            background: user?.cover_url ? 'transparent' : 'linear-gradient(135deg, #FF5C35 0%, #FF9A00 100%)',
+          }}
+        >
+          {user?.cover_url && <img src={user.cover_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.22)', display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', padding: '8px 10px' }}>
+            <div style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, backdropFilter: 'blur(4px)' }}>
+              {photoUploading ? 'Uploading…' : 'Edit Banner'}
+            </div>
+          </div>
         </div>
+
+        {/* Avatar */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: -32, paddingBottom: 12 }}>
+          <div onClick={() => avatarInputRef.current.click()} style={{ position: 'relative', cursor: 'pointer' }}>
+            <Avatar user={user} size={72} />
+            <div style={{
+              position: 'absolute', bottom: 0, right: -2, width: 24, height: 24, borderRadius: '50%',
+              background: 'var(--brand)', border: '2px solid white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
+            }}>📷</div>
+          </div>
+          <div onClick={() => avatarInputRef.current.click()} style={{ marginTop: 8, fontSize: 13, color: 'var(--brand)', fontWeight: 600, cursor: 'pointer' }}>
+            {photoUploading ? 'Uploading…' : 'Change Photo'}
+          </div>
+        </div>
+
+        {/* Hidden file inputs */}
+        <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickPhoto('avatar', 1, true, 'Crop Profile Photo')} />
+        <input ref={coverInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickPhoto('cover_url', 3, false, 'Crop Banner')} />
 
         <Section title="Profile">
           <div style={{ padding: '8px 16px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -234,6 +290,16 @@ export default function Settings() {
 
       {showTos && <TosModal onClose={() => setShowTos(false)} />}
       {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
+      {cropState && (
+        <CropModal
+          file={cropState.file}
+          aspect={cropState.aspect}
+          circular={cropState.circular}
+          title={cropState.title}
+          onDone={handleCropDone}
+          onCancel={() => setCropState(null)}
+        />
+      )}
 
       {showDeleteSheet && (
         <div className="drawer-backdrop" onClick={() => setShowDeleteSheet(false)}>
