@@ -104,7 +104,7 @@ function FilterToggle({ on, onChange }) {
   );
 }
 
-function FilterSheet({ filters, onApply, onClose }) {
+function FilterSheet({ filters, onApply, onClose, locationPublic, onToggleLocation }) {
   const [local, setLocal] = useState({ ...filters });
   const set = (k, v) => setLocal(f => ({ ...f, [k]: v }));
 
@@ -124,12 +124,20 @@ function FilterSheet({ filters, onApply, onClose }) {
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 16px 4px' }}>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0 16px', borderBottom: '1px solid var(--border)' }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 500 }}>Available to play only</div>
               <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Only show players who are free right now</div>
             </div>
             <FilterToggle on={local.availableOnly} onChange={v => set('availableOnly', v)} />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 0 14px' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>Share my location</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Let others see you on the map</div>
+            </div>
+            <FilterToggle on={locationPublic} onChange={onToggleLocation} />
           </div>
 
         </div>
@@ -507,6 +515,9 @@ export default function MapScreen() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [zip, setZip] = useState('');
+  const [locationPublic, setLocationPublic] = useState(
+    () => localStorage.getItem('picklepal_location_public') === '1'
+  );
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const mapRef = useRef(null);
@@ -639,6 +650,13 @@ export default function MapScreen() {
     localStorage.setItem('picklepal_location_public', '0');
     setShowLocationModal(false);
     api.put('/users/me', { location_public: 0 }).catch(() => {});
+  };
+
+  const handleToggleLocation = (on) => {
+    setLocationPublic(on);
+    localStorage.setItem('picklepal_location_public', on ? '1' : '0');
+    localStorage.setItem('picklepal_location_decided', '1');
+    api.put('/users/me', { location_public: on ? 1 : 0 }).catch(() => {});
   };
 
   const filteredPlayers = players.filter(p => {
@@ -865,7 +883,13 @@ export default function MapScreen() {
         <LocationShareModal onShare={handleShareLocation} onDecline={handleDeclineLocation} />
       )}
       {showFilters && (
-        <FilterSheet filters={filters} onApply={setFilters} onClose={() => setShowFilters(false)} />
+        <FilterSheet
+          filters={filters}
+          onApply={setFilters}
+          onClose={() => setShowFilters(false)}
+          locationPublic={locationPublic}
+          onToggleLocation={handleToggleLocation}
+        />
       )}
       {selectedPlayer && (
         <PlayerProfileModal
