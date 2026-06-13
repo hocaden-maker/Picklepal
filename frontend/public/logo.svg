@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 250">
+  <!-- Blue motion dots (left) -->
+  <circle cx="42" cy="62" r="5.5" fill="#5BA4F5"/>
+  <circle cx="62" cy="46" r="4" fill="#5BA4F5"/>
+
+  <!-- Orange motion dots (right) -->
+  <circle cx="258" cy="62" r="5.5" fill="#FF8B1A"/>
+  <circle cx="238" cy="46" r="4" fill="#FF8B1A"/>
+
+  <!-- Pickleball -->
+  <circle cx="150" cy="52" r="24" fill="#FFC107" stroke="#1D2C5A" stroke-width="3.5"/>
+  <circle cx="141" cy="44" r="3.8" fill="#8B6400" opacity="0.9"/>
+  <circle cx="154" cy="41" r="3.8" fill="#8B6400" opacity="0.9"/>
+  <circle cx="163" cy="50" r="3.8" fill="#8B6400" opacity="0.9"/>
+  <circle cx="157" cy="62" r="3.8" fill="#8B6400" opacity="0.9"/>
+  <circle cx="143" cy="63" r="3.8" fill="#8B6400" opacity="0.9"/>
+  <circle cx="137" cy="53" r="3.8" fill="#8B6400" opacity="0.9"/>
+
+  <!-- Blue paddle (left) — rotate +12 deg (lean right toward orange) -->
+  <g transform="translate(95,135) rotate(12)">
+    <!-- Head outline -->
+    <ellipse cx="0" cy="-30" rx="53" ry="62" fill="#1D2C5A"/>
+    <!-- Head fill -->
+    <ellipse cx="0" cy="-30" rx="47" ry="56" fill="#5BA4F5"/>
+    <!-- Shine highlight -->
+    <ellipse cx="-10" cy="-58" rx="16" ry="10" fill="rgba(255,255,255,0.28)" transform="rotate(-20,-10,-58)"/>
+    <!-- Handle outline -->
+    <rect x="-11" y="28" width="22" height="52" rx="9" fill="#1D2C5A"/>
+    <!-- Handle fill -->
+    <rect x="-7.5" y="30" width="15" height="50" rx="6" fill="#3A5C9A"/>
+    <!-- Grip lines -->
+    <rect x="-7.5" y="43" width="15" height="3.5" rx="1.5" fill="#2A4070"/>
+    <rect x="-7.5" y="52" width="15" height="3.5" rx="1.5" fill="#2A4070"/>
+    <rect x="-7.5" y="61" width="15" height="3.5" rx="1.5" fill="#2A4070"/>
+    <!-- Eyes -->
+    <circle cx="-17" cy="-35" r="9" fill="white"/>
+    <circle cx="17" cy="-35" r="9" fill="white"/>
+    <circle cx="-15" cy="-33" r="5.5" fill="#111"/>
+    <circle cx="19" cy="-33" r="5.5" fill="#111"/>
+    <circle cx="-13" cy="-35" r="2.2" fill="white"/>
+    <circle cx="21" cy="-35" r="2.2" fill="white"/>
+    <!-- Smile -->
+    <path d="M -18 -16 Q 0 2 18 -16" stroke="#1a1a1a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <!-- Blush -->
+    <circle cx="-31" cy="-10" r="7.5" fill="#FF9BB0" opacity="0.52"/>
+    <circle cx="31" cy="-10" r="7.5" fill="#FF9BB0" opacity="0.52"/>
+  </g>
+
+  <!-- Orange paddle (right) — rotate -12 deg (lean left toward blue) -->
+  <g transform="translate(205,135) rotate(-12)">
+    <!-- Head outline -->
+    <ellipse cx="0" cy="-30" rx="53" ry="62" fill="#1D2C5A"/>
+    <!-- Head fill -->
+    <ellipse cx="0" cy="-30" rx="47" ry="56" fill="#FF8B1A"/>
+    <!-- Shine highlight -->
+    <ellipse cx="-10" cy="-58" rx="16" ry="10" fill="rgba(255,255,255,0.28)" transform="rotate(-20,-10,-58)"/>
+    <!-- Handle outline -->
+    <rect x="-11" y="28" width="22" height="52" rx="9" fill="#1D2C5A"/>
+    <!-- Handle fill -->
+    <rect x="-7.5" y="30" width="15" height="50" rx="6" fill="#8B4E10"/>
+    <!-- Grip lines -->
+    <rect x="-7.5" y="43" width="15" height="3.5" rx="1.5" fill="#6A3A08"/>
+    <rect x="-7.5" y="52" width="15" height="3.5" rx="1.5" fill="#6A3A08"/>
+    <rect x="-7.5" y="61" width="15" height="3.5" rx="1.5" fill="#6A3A08"/>
+    <!-- Eyes -->
+    <circle cx="-17" cy="-35" r="9" fill="white"/>
+    <circle cx="17" cy="-35" r="9" fill="white"/>
+    <circle cx="-15" cy="-33" r="5.5" fill="#111"/>
+    <circle cx="19" cy="-33" r="5.5" fill="#111"/>
+    <circle cx="-13" cy="-35" r="2.2" fill="white"/>
+    <circle cx="21" cy="-35" r="2.2" fill="white"/>
+    <!-- Smile -->
+    <path d="M -18 -16 Q 0 2 18 -16" stroke="#1a1a1a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <!-- Blush -->
+    <circle cx="-31" cy="-10" r="7.5" fill="#FF9BB0" opacity="0.52"/>
+    <circle cx="31" cy="-10" r="7.5" fill="#FF9BB0" opacity="0.52"/>
+  </g>
+</svg>

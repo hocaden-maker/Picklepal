@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Environment variables (contains secrets — never commit)
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Capacitor / native builds
+frontend/ios/App/Pods/
+frontend/android/.gradle/
+frontend/android/build/
+frontend/android/app/build/
+frontend/.capacitor/
+
+# IDE
+.vscode/
+.idea/

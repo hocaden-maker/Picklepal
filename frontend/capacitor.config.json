@@ -1,0 +1,13 @@
+{
+  "appId": "com.picklepal.app",
+  "appName": "PicklePal",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "Geolocation": {
+      "permissions": ["location"]
+    }
+  }
+}
