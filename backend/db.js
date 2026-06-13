@@ -126,22 +126,29 @@ try { db.exec(`ALTER TABLE posts ADD COLUMN court_name TEXT DEFAULT ''`); } catc
 // Migrate existing DBs that predate geocoded column on courts_cache
 try { db.exec(`ALTER TABLE courts_cache ADD COLUMN geocoded INTEGER DEFAULT 0`); } catch {}
 
-// Seed courts from bundled JSON if the table is empty (fresh deploy)
+// Seed courts from bundled JSON.
+// If old seed courts exist without geocoded=1, replace them with GPS-accurate OSM data.
 try {
-  const count = db.prepare('SELECT COUNT(*) as c FROM courts_cache').get().c;
-  if (count === 0) {
+  const oldSeeds = db.prepare("SELECT COUNT(*) as c FROM courts_cache WHERE id LIKE 'seed_%' AND geocoded = 0").get().c;
+  if (oldSeeds > 0) {
+    db.exec("DELETE FROM courts_cache WHERE id LIKE 'seed_%'");
+    console.log(`Removed ${oldSeeds} approximate seed courts — replacing with GPS-accurate data`);
+  }
+  const hasSeeds = db.prepare("SELECT COUNT(*) as c FROM courts_cache WHERE id LIKE 'seed_%'").get().c;
+  if (hasSeeds === 0) {
     const seedPath = path.join(__dirname, 'data', 'courts_seed.json');
     if (fs.existsSync(seedPath)) {
       const courts = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
       const stmt = db.prepare(
-        'INSERT OR IGNORE INTO courts_cache (id, name, lat, lon, city, court_count, access, surface, description) VALUES (?,?,?,?,?,?,?,?,?)'
+        'INSERT OR IGNORE INTO courts_cache (id, name, lat, lon, city, court_count, access, surface, description, geocoded) VALUES (?,?,?,?,?,?,?,?,?,1)'
       );
       let n = 0;
       for (const c of courts) {
+        if (!c.lat || !c.lon) continue;
         const id = 'seed_' + (++n);
-        stmt.run(id, c.name || '', c.lat || 0, c.lon || 0, c.city || '', c.court_count || 0, c.access || 'public', c.surface || '', c.description || '');
+        stmt.run(id, c.name || '', c.lat, c.lon, c.city || '', c.court_count || 0, c.access || 'public', c.surface || '', c.description || '');
       }
-      console.log(`Seeded ${n} courts from courts_seed.json`);
+      console.log(`Seeded ${n} GPS-accurate courts from OSM`);
     }
   }
 } catch (e) { console.error('Seed error:', e.message); }
