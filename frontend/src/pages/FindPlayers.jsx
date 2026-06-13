@@ -34,6 +34,31 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function FollowButton({ username, initialFollowing }) {
+  const api = useApi();
+  const [following, setFollowing] = useState(!!initialFollowing);
+  const [loading, setLoading] = useState(false);
+  const toggle = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const res = await api.post(`/users/${username}/follow`, {});
+      setFollowing(res.following);
+    } catch {}
+    setLoading(false);
+  };
+  return (
+    <button
+      className={`btn btn-sm${following ? ' btn-secondary' : ' btn-primary'}`}
+      onClick={toggle}
+      disabled={loading}
+      style={{ minWidth: 76 }}
+    >
+      {loading ? '…' : following ? '✓ Following' : 'Follow'}
+    </button>
+  );
+}
+
 function InviteButton({ userId }) {
   const api = useApi();
   const [status, setStatus] = useState('idle');
@@ -367,6 +392,7 @@ export default function FindPlayers() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <FollowButton username={p.username} initialFollowing={p.is_following} />
                   <InviteButton userId={p.id} />
                   <button className="btn btn-secondary btn-sm"
                     onClick={() => navigate(`/messages/${p.id}`)}>

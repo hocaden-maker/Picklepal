@@ -36,7 +36,11 @@ router.get('/search', authenticate, async (req, res) => {
     where += ` AND is_available = 1`;
   }
 
-  const users = await db.prepare(`SELECT ${PUB} FROM users ${where} ORDER BY dupr_rating DESC LIMIT 30`).all(...params);
+  const users = await db.prepare(`
+    SELECT ${PUB},
+      CASE WHEN EXISTS(SELECT 1 FROM follows WHERE follower_id = ? AND following_id = id) THEN 1 ELSE 0 END as is_following
+    FROM users ${where} ORDER BY dupr_rating DESC LIMIT 30
+  `).all(req.user.id, ...params);
   res.json(users);
 });
 
