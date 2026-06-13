@@ -34,8 +34,12 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
   const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
-  if (!row || !await bcrypt.compare(password, row.password))
-    return res.status(401).json({ error: 'Invalid credentials' });
+  if (!row) return res.status(401).json({ error: 'No account found with that email' });
+  // Google-only accounts have no password — give a clear message instead of crashing
+  if (!row.password) return res.status(401).json({ error: 'This account uses Google Sign-In. Please tap "Sign in with Google".' });
+  let valid = false;
+  try { valid = await bcrypt.compare(password, row.password); } catch {}
+  if (!valid) return res.status(401).json({ error: 'Incorrect password' });
   const user = db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(row.id);
   const token = jwt.sign({ id: row.id }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ token, user });
