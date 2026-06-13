@@ -33,6 +33,14 @@ app.post('/api/upload', authenticate, upload.single('image'), (req, res) => {
   res.json({ url: `/uploads/${req.file.filename}` });
 });
 
+app.get('/api/debug-env', (req, res) => {
+  res.json({
+    google_client_id_set: !!process.env.GOOGLE_CLIENT_ID,
+    google_client_id_prefix: process.env.GOOGLE_CLIENT_ID?.slice(0, 15) || 'NOT SET',
+    jwt_secret_set: !!process.env.JWT_SECRET,
+    node_version: process.version,
+  });
+});
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/posts', require('./routes/posts'));
 app.use('/api/users', require('./routes/users'));
