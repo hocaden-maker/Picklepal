@@ -43,8 +43,28 @@ router.get('/', authenticate, async (req, res) => {
     }
   }
 
-  // Always return all courts from cache
-  const courts = db.prepare('SELECT * FROM courts_cache ORDER BY name LIMIT 15000').all();
+  // Return courts sorted by distance when location is provided
+  if (lat && lon) {
+    const latF = parseFloat(lat), lonF = parseFloat(lon);
+    const delta = 0.75; // ~80 km bounding box
+    const rows = db.prepare(`
+      SELECT * FROM courts_cache
+      WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?
+        AND lat != 0 AND lon != 0
+      LIMIT 500
+    `).all(latF - delta, latF + delta, lonF - delta, lonF + delta);
+
+    const cosLat = Math.cos(latF * Math.PI / 180);
+    const withDist = rows.map(c => {
+      const dlat = (c.lat - latF) * 111;
+      const dlng = (c.lon - lonF) * 111 * cosLat;
+      return { ...c, distance_km: Math.sqrt(dlat * dlat + dlng * dlng) };
+    }).sort((a, b) => a.distance_km - b.distance_km).slice(0, 150);
+
+    return res.json(withDist);
+  }
+
+  const courts = db.prepare('SELECT * FROM courts_cache ORDER BY name LIMIT 150').all();
   res.json(courts);
 });
 

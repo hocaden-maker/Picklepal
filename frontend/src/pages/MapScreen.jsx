@@ -773,7 +773,10 @@ export default function MapScreen() {
               : filteredCourts.slice(0, 6).map(c => (
                 <div key={c.id} className="court-chip" onClick={() => setSelectedCourt(c)}>
                   <div className="court-chip-name">{c.name}</div>
-                  <div className="court-chip-meta">{c.court_count ? `${c.court_count} courts` : 'Courts'}{c.city ? ` · ${c.city}` : ''}</div>
+                  <div className="court-chip-meta">
+                    {c.court_count ? `${c.court_count} courts` : 'Courts'}
+                    {c.distance_km != null ? ` · ${c.distance_km < 1 ? (c.distance_km * 1000).toFixed(0) + 'm' : c.distance_km.toFixed(1) + ' km'}` : c.city ? ` · ${c.city}` : ''}
+                  </div>
                 </div>
               ))
             }
