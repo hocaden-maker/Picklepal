@@ -2,12 +2,17 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const { OAuth2Client } = require('google-auth-library');
 const db = require('../db');
 const { authenticate, JWT_SECRET } = require('../middleware');
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-console.log('Google Client ID loaded:', process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.slice(0, 20) + '...' : 'NOT SET');
+async function verifyGoogleToken(credential) {
+  const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`;
+  const res = await fetch(url);
+  const payload = await res.json();
+  if (payload.error) throw new Error(payload.error_description || payload.error);
+  if (payload.aud !== process.env.GOOGLE_CLIENT_ID) throw new Error('Client ID mismatch');
+  return payload;
+}
 
 const router = express.Router();
 
@@ -56,11 +61,8 @@ router.post('/google', async (req, res) => {
   const { credential } = req.body;
   if (!credential) return res.status(400).json({ error: 'Missing credential' });
   try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-    const { sub: googleId, email, name, picture } = ticket.getPayload();
+    const payload = await verifyGoogleToken(credential);
+    const { sub: googleId, email, name, picture } = payload;
     let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
     if (!user) {
       const id = uuidv4();
