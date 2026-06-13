@@ -7,9 +7,11 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem('pp_token'));
   const [loading, setLoading] = useState(true);
 
+  const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+
   useEffect(() => {
     if (!token) { setLoading(false); return; }
-    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null)
       .then(u => { if (u) setUser(u); else { setToken(null); localStorage.removeItem('pp_token'); } })
       .catch(() => {})

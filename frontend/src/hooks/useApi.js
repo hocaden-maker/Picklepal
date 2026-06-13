@@ -30,6 +30,11 @@ export function useApi() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Upload failed');
+    // Convert relative upload path to absolute so images load on production
+    if (data.url?.startsWith('/')) {
+      const origin = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      data.url = `${origin}${data.url}`;
+    }
     return data;
   };
 
