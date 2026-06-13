@@ -211,7 +211,7 @@ export default function Profile() {
 
   if (!user) return null;
 
-  const winRate = user.wins + user.losses > 0 ? Math.round((user.wins / (user.wins + user.losses)) * 100) : 0;
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -290,10 +290,6 @@ export default function Profile() {
             <div className="profile-stat-label">Posts</div>
           </div>
           <div className="profile-stat">
-            <div className="profile-stat-val" style={{ color: 'var(--brand)' }}>{winRate}%</div>
-            <div className="profile-stat-label">Win Rate</div>
-          </div>
-          <div className="profile-stat">
             <div className="profile-stat-val">{user.followers_count || 0}</div>
             <div className="profile-stat-label">Followers</div>
           </div>
@@ -349,7 +345,6 @@ export default function Profile() {
         {tab === 'stats' && (
           <div style={{ padding: 16 }}>
             {[
-              { label: 'Win Rate', value: `${winRate}%`, sub: `${user.wins}W · ${user.losses}L` },
               { label: 'DUPR Rating', value: user.dupr_verified ? user.dupr_rating?.toFixed(3) : 'Not linked', sub: user.dupr_verified ? '✓ Verified' : 'Link your account' },
               { label: 'Skill Level', value: user.skill_level, sub: 'Self-reported' },
               { label: 'Total Games', value: (user.wins || 0) + (user.losses || 0), sub: 'All time' },
