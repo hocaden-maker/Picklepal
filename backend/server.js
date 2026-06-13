@@ -40,6 +40,7 @@ app.use('/api/dupr', require('./routes/dupr'));
 app.use('/api/dm', require('./routes/dm'));
 app.use('/api/invites', require('./routes/invites'));
 app.use('/api/stories', require('./routes/stories'));
+app.use('/api/threads', require('./routes/threads'));
 
 
 io.on('connection', socket => {
