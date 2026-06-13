@@ -48,6 +48,8 @@ db.exec(`
     score TEXT DEFAULT '',
     result TEXT DEFAULT '',
     location TEXT DEFAULT '',
+    court_id TEXT DEFAULT NULL,
+    court_name TEXT DEFAULT '',
     likes_count INTEGER DEFAULT 0,
     comments_count INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -117,6 +119,9 @@ db.exec(`
 // Migrate existing DBs that predate cover_url / location_public columns
 try { db.exec(`ALTER TABLE users ADD COLUMN cover_url TEXT DEFAULT ''`); } catch {}
 try { db.exec(`ALTER TABLE users ADD COLUMN location_public INTEGER DEFAULT 0`); } catch {}
+// Migrate existing DBs that predate court_id / court_name on posts
+try { db.exec(`ALTER TABLE posts ADD COLUMN court_id TEXT DEFAULT NULL`); } catch {}
+try { db.exec(`ALTER TABLE posts ADD COLUMN court_name TEXT DEFAULT ''`); } catch {}
 
 // Seed courts from bundled JSON if the table is empty (fresh deploy)
 try {
