@@ -18,6 +18,7 @@ L.Icon.Default.mergeOptions({
 const AUSTIN = [30.2672, -97.7431];
 const SHEET_H = 72;
 const SNAPS = [0, 33, 57];
+const DB_DEBOUNCE_MS = 15000;
 
 const DEFAULT_FILTERS = {
   showCourts: true,
@@ -71,9 +72,9 @@ function meIcon() {
   });
 }
 
-function SetView({ center }) {
+function MapController({ mapRef }) {
   const map = useMap();
-  useEffect(() => { map.setView(center, 14); }, [center]);
+  useEffect(() => { mapRef.current = map; }, [map]);
   return null;
 }
 
@@ -495,7 +496,8 @@ export default function MapScreen() {
   const navigate = useNavigate();
   const [players, setPlayers] = useState([]);
   const [courts, setCourts] = useState([]);
-  const [center, setCenter] = useState(AUSTIN);
+  const [myPos, setMyPos] = useState(null);       // live GPS blue dot
+  const [center, setCenter] = useState(AUSTIN);   // initial map center only
   const [loading, setLoading] = useState(true);
   const [selectedCourt, setSelectedCourt] = useState(null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
@@ -503,6 +505,8 @@ export default function MapScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const mapRef = useRef(null);
+  const dbDebounce = useRef(null);
 
   // Draggable sheet
   const [translateVh, setTranslateVh] = useState(SNAPS[1]);
@@ -546,7 +550,11 @@ export default function MapScreen() {
     setIsDragging(true);
   };
 
+  // Single location effect: always get GPS, always watch, center once on first fix
   useEffect(() => {
+    let stopWatch = () => {};
+    let centered = false;
+
     const load = async (lat, lng) => {
       try {
         const [p, c] = await Promise.all([
@@ -559,50 +567,52 @@ export default function MapScreen() {
       setLoading(false);
     };
 
-    const decided = localStorage.getItem('picklepal_location_decided');
-
-    const tryGeo = async (onSuccess) => {
-      try {
-        const pos = await getCurrentPosition();
-        onSuccess(pos.lat, pos.lng);
-      } catch {
-        onSuccess(AUSTIN[0], AUSTIN[1]);
+    const onPosition = ({ lat, lng }) => {
+      setMyPos([lat, lng]);
+      if (!centered) {
+        centered = true;
+        setCenter([lat, lng]);
+        if (mapRef.current) mapRef.current.setView([lat, lng], 14);
+        load(lat, lng);
+      }
+      // Update DB if user is sharing location (debounced)
+      if (localStorage.getItem('picklepal_location_public') === '1') {
+        clearTimeout(dbDebounce.current);
+        dbDebounce.current = setTimeout(() => {
+          api.put('/users/me', { lat, lng }).catch(() => {});
+        }, DB_DEBOUNCE_MS);
       }
     };
 
-    if (user?.lat && user.lat !== 0) {
-      setCenter([user.lat, user.lng]);
-      load(user.lat, user.lng);
-      if (!decided) setShowLocationModal(true);
-    } else if (!decided) {
-      tryGeo((lat, lng) => { setCenter([lat, lng]); load(lat, lng); setShowLocationModal(true); });
-    } else {
-      tryGeo((lat, lng) => { setCenter([lat, lng]); load(lat, lng); });
-    }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Live location watch — updates map center and DB (debounced) while app is open
-  useEffect(() => {
-    const decided = localStorage.getItem('picklepal_location_decided');
-    const isSharing = localStorage.getItem('picklepal_location_public') === '1';
-    if (!decided) return;
-
-    let stopWatch = () => {};
-    const dbDebounce = { t: null };
-
-    watchPosition(({ lat, lng }) => {
-      setCenter([lat, lng]);
-      if (isSharing) {
-        clearTimeout(dbDebounce.t);
-        dbDebounce.t = setTimeout(() => {
-          api.put('/users/me', { lat, lng }).catch(() => {});
-        }, 15000); // update DB at most every 15s while moving
+    const init = async () => {
+      // Try immediate GPS fix to center the map fast
+      try {
+        const pos = await getCurrentPosition();
+        onPosition(pos);
+      } catch {
+        // GPS denied or unavailable — fall back to Austin and load
+        if (!centered) {
+          centered = true;
+          load(AUSTIN[0], AUSTIN[1]);
+        }
       }
-    }).then(stop => { stopWatch = stop; });
 
-    return () => { stopWatch(); };
+      // Always start continuous watch so blue dot stays accurate
+      try {
+        stopWatch = await watchPosition(onPosition);
+      } catch {}
+
+      // Show location share prompt if user hasn't been asked yet
+      if (!localStorage.getItem('picklepal_location_decided')) {
+        setShowLocationModal(true);
+      }
+    };
+
+    init();
+    return () => {
+      stopWatch();
+      clearTimeout(dbDebounce.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -611,13 +621,17 @@ export default function MapScreen() {
     localStorage.setItem('picklepal_location_public', '1');
     setShowLocationModal(false);
     await requestPermission();
-    try {
-      const { lat, lng } = await getCurrentPosition();
-      setCenter([lat, lng]);
-      api.put('/users/me', { lat, lng, location_public: 1 }).catch(() => {});
-      api.get(`/users/nearby?lat=${lat}&lng=${lng}`).then(p => setPlayers(p.filter(u => u.lat && u.lng))).catch(() => {});
-      api.get(`/courts?lat=${lat}&lon=${lng}`).then(c => setCourts(c.filter(c => c.lat && c.lon))).catch(() => {});
-    } catch {}
+    // GPS watch already running — just save to DB and fly to current pos
+    if (myPos) {
+      api.put('/users/me', { lat: myPos[0], lng: myPos[1], location_public: 1 }).catch(() => {});
+      mapRef.current?.flyTo(myPos, 15, { duration: 1.2 });
+    } else {
+      try {
+        const { lat, lng } = await getCurrentPosition();
+        api.put('/users/me', { lat, lng, location_public: 1 }).catch(() => {});
+        mapRef.current?.flyTo([lat, lng], 15, { duration: 1.2 });
+      } catch {}
+    }
   };
 
   const handleDeclineLocation = () => {
@@ -656,12 +670,12 @@ export default function MapScreen() {
   return (
     <div className="map-page">
       <MapContainer center={center} zoom={14} style={{ flex: 1, minHeight: 0 }} zoomControl={false}>
-        <SetView center={center} />
+        <MapController mapRef={mapRef} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <Marker position={center} icon={meIcon()} />
+        {myPos && <Marker position={myPos} icon={meIcon()} />}
         {filters.showCourts && filteredCourts.map(c => (
           <Marker key={c.id} position={[c.lat, c.lon]} icon={courtIcon()}
             eventHandlers={{ click: () => setSelectedCourt(c) }}>
@@ -714,6 +728,24 @@ export default function MapScreen() {
           )}
         </button>
       </div>
+
+      {/* Locate-me button */}
+      <button
+        onClick={() => {
+          if (myPos && mapRef.current) mapRef.current.flyTo(myPos, 15, { duration: 1 });
+        }}
+        style={{
+          position: 'absolute', right: 14, bottom: `calc(${SHEET_H - translateVh}vh + 16px)`,
+          zIndex: 800, width: 44, height: 44, borderRadius: '50%',
+          background: 'white', border: 'none', boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+        }}>
+        <svg viewBox="0 0 24 24" fill="none" stroke={myPos ? '#4466ff' : '#9CA3AF'} strokeWidth="2.5" width={20} height={20}>
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+          <circle cx="12" cy="12" r="9" strokeOpacity="0.3"/>
+        </svg>
+      </button>
 
       <div className="map-sheet" style={sheetStyle}>
         <div
