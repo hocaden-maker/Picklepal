@@ -495,13 +495,10 @@ export default function MapScreen() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [players, setPlayers] = useState([]);
-  const [courts, setCourts] = useState([]);
-  const [myPos, setMyPos] = useState(null);       // live GPS blue dot
-  const [center, setCenter] = useState(AUSTIN);   // initial map center only
+  const [myPos, setMyPos] = useState(null);
+  const [center, setCenter] = useState(AUSTIN);
   const [loading, setLoading] = useState(true);
-  const [selectedCourt, setSelectedCourt] = useState(null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [showAllCourts, setShowAllCourts] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [zip, setZip] = useState('');
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -558,12 +555,8 @@ export default function MapScreen() {
 
     const load = async (lat, lng) => {
       try {
-        const [p, c] = await Promise.all([
-          api.get(`/users/nearby?lat=${lat}&lng=${lng}`),
-          api.get(`/courts?lat=${lat}&lon=${lng}`),
-        ]);
+        const p = await api.get(`/users/nearby?lat=${lat}&lng=${lng}`);
         setPlayers(p.filter(u => u.lat && u.lng));
-        setCourts(c.filter(c => c.lat && c.lon));
       } catch {}
       setLoading(false);
     };
@@ -642,12 +635,6 @@ export default function MapScreen() {
     api.put('/users/me', { location_public: 0 }).catch(() => {});
   };
 
-  // Apply filters
-  const filteredCourts = courts.filter(c => {
-    if (filters.courtAccess !== 'all' && c.access !== filters.courtAccess) return false;
-    return true;
-  });
-
   const filteredPlayers = players.filter(p => {
     if (filters.availableOnly && !p.is_available) return false;
     if (filters.playerSkill !== 'all' && p.skill_level !== filters.playerSkill) return false;
@@ -655,8 +642,7 @@ export default function MapScreen() {
   });
 
   const availablePlayers = filteredPlayers.filter(p => p.is_available);
-  const hasActiveFilters = filters.courtAccess !== 'all' || filters.playerSkill !== 'all'
-    || !filters.showCourts || !filters.showPlayers || filters.availableOnly;
+  const hasActiveFilters = filters.playerSkill !== 'all' || !filters.showPlayers || filters.availableOnly;
 
   const sheetStyle = {
     height: `${SHEET_H}vh`,
@@ -677,20 +663,6 @@ export default function MapScreen() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {myPos && <Marker position={myPos} icon={meIcon()} />}
-        {filters.showCourts && filteredCourts.map(c => (
-          <Marker key={c.id} position={[c.lat, c.lon]} icon={courtIcon()}
-            eventHandlers={{ click: () => setSelectedCourt(c) }}>
-            <Popup>
-              <strong>{c.name}</strong><br />
-              {c.court_count ? `${c.court_count} courts` : ''}{c.city ? ` · ${c.city}` : ''}
-              <br />
-              <a href={`https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lon}`} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'inline-block', marginTop: 6, fontSize: 12, color: '#FF5C35', fontWeight: 600, textDecoration: 'none' }}>
-                🗺️ Directions
-              </a>
-            </Popup>
-          </Marker>
-        ))}
         {filters.showPlayers && filteredPlayers.map(p => (
           <Marker key={p.id} position={[p.lat, p.lng]} icon={playerIcon(p)}
             eventHandlers={{ click: () => setSelectedPlayer(p) }}>
@@ -905,14 +877,8 @@ export default function MapScreen() {
       {showFilters && (
         <FilterSheet filters={filters} onApply={setFilters} onClose={() => setShowFilters(false)} />
       )}
-      {selectedCourt && (
-        <CourtDetailSheet court={selectedCourt} onClose={() => setSelectedCourt(null)} />
-      )}
       {selectedPlayer && (
         <PlayerProfileModal player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />
-      )}
-      {showAllCourts && (
-        <AllCourtsSheet courts={filteredCourts} onSelect={c => setSelectedCourt(c)} onClose={() => setShowAllCourts(false)} />
       )}
     </div>
   );
