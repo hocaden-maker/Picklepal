@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
@@ -16,7 +16,6 @@ export default function CreatePost() {
   const api = useApi();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const fileRef = useRef();
   const [image, setImage] = useState(null);
   const [imageUrl, setImageUrl] = useState('');
@@ -28,24 +27,6 @@ export default function CreatePost() {
   const [uploading, setUploading] = useState(false);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState('');
-  const [taggedCourt, setTaggedCourt] = useState(null);
-  const [courtSearch, setCourtSearch] = useState('');
-  const [courtResults, setCourtResults] = useState([]);
-  const [showCourtSearch, setShowCourtSearch] = useState(false);
-
-  useEffect(() => {
-    const cid = searchParams.get('court_id');
-    const cname = searchParams.get('court_name');
-    if (cid && cname) setTaggedCourt({ id: cid, name: cname });
-  }, []);
-
-  useEffect(() => {
-    if (!courtSearch.trim()) { setCourtResults([]); return; }
-    const t = setTimeout(() => {
-      api.get(`/courts?q=${encodeURIComponent(courtSearch)}`).then(setCourtResults).catch(() => {});
-    }, 300);
-    return () => clearTimeout(t);
-  }, [courtSearch]);
 
   const handleImage = async (file) => {
     if (!file) return;
@@ -73,8 +54,7 @@ export default function CreatePost() {
         location,
         result: type === 'result' ? result : '',
         score: type === 'result' ? score : '',
-        court_id: taggedCourt?.id || null,
-        court_name: taggedCourt?.name || null,
+
       });
       navigate('/home');
     } catch (err) {
@@ -174,43 +154,6 @@ export default function CreatePost() {
             </div>
           </div>
 
-          <div>
-            <div className="field-label">Tag a Court (optional)</div>
-            {taggedCourt
-              ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--brand-50)', border: '1px solid var(--brand-100)', borderRadius: 10 }}>
-                  <span style={{ fontSize: 16 }}>🏓</span>
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--brand)' }}>{taggedCourt.name}</span>
-                  <button onClick={() => setTaggedCourt(null)} style={{ color: 'var(--text-3)', fontSize: 18, lineHeight: 1 }}>✕</button>
-                </div>
-              ) : (
-                <div style={{ position: 'relative' }}>
-                  <div className="field" style={{ height: 44 }}>
-                    <span style={{ fontSize: 16 }}>🏓</span>
-                    <input
-                      value={courtSearch}
-                      onChange={e => { setCourtSearch(e.target.value); setShowCourtSearch(true); }}
-                      onFocus={() => setShowCourtSearch(true)}
-                      placeholder="Search for a court…"
-                      style={{ fontSize: 14 }}
-                    />
-                  </div>
-                  {showCourtSearch && courtResults.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: 'white', border: '1px solid var(--border)', borderRadius: 10, boxShadow: 'var(--shadow)', maxHeight: 180, overflowY: 'auto' }}>
-                      {courtResults.slice(0, 6).map(c => (
-                        <div key={c.id}
-                          style={{ padding: '9px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: 13 }}
-                          onMouseDown={() => { setTaggedCourt(c); setCourtSearch(''); setShowCourtSearch(false); setCourtResults([]); }}>
-                          <div style={{ fontWeight: 600 }}>{c.name}</div>
-                          <div style={{ color: 'var(--text-3)', fontSize: 12 }}>{c.city}{c.court_count ? ` · ${c.court_count} courts` : ''}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            }
-          </div>
         </div>
         <div style={{ height: 16 }} />
       </div>
