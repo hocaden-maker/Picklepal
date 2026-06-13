@@ -19,7 +19,7 @@ const router = express.Router();
 const SAFE = 'id, username, email, display_name, bio, avatar, cover_url, location, lat, lng, skill_level, dupr_id, dupr_rating, singles_rating, doubles_rating, dupr_verified, wins, losses, followers_count, following_count, posts_count, is_available';
 
 router.post('/register', async (req, res) => {
-  const { username, email, password, display_name, skill_level } = req.body;
+  const { username, email, password, display_name, skill_level, location, lat, lng } = req.body;
   if (!username || !email || !password || !display_name)
     return res.status(400).json({ error: 'All fields required' });
   if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email.toLowerCase()))
@@ -28,8 +28,9 @@ router.post('/register', async (req, res) => {
     return res.status(409).json({ error: 'Username taken' });
   const id = uuidv4();
   const hashed = await bcrypt.hash(password, 10);
-  db.prepare('INSERT INTO users (id, username, email, password, display_name, skill_level, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(id, username.toLowerCase(), email.toLowerCase(), hashed, display_name, skill_level || 'intermediate', '');
+  const hasLoc = lat && lng && parseFloat(lat) !== 0 && parseFloat(lng) !== 0;
+  db.prepare('INSERT INTO users (id, username, email, password, display_name, skill_level, avatar, location, lat, lng, location_public) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, username.toLowerCase(), email.toLowerCase(), hashed, display_name, skill_level || 'intermediate', '', location || '', hasLoc ? parseFloat(lat) : 0, hasLoc ? parseFloat(lng) : 0, hasLoc ? 1 : 0);
   const user = db.prepare(`SELECT ${SAFE} FROM users WHERE id = ?`).get(id);
   const token = jwt.sign({ id }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ token, user });

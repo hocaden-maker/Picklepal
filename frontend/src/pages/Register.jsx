@@ -18,15 +18,39 @@ const SKILL_META = {
 };
 
 function RegisterInner() {
-  const [form, setForm] = useState({ username: '', email: '', password: '', display_name: '', skill_level: 'intermediate' });
+  const [form, setForm] = useState({ username: '', email: '', password: '', display_name: '', skill_level: 'intermediate', location: '', lat: 0, lng: 0 });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [tosAccepted, setTosAccepted] = useState(false);
   const [showTos, setShowTos] = useState(false);
+  const [locLoading, setLocLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const detectLocation = () => {
+    if (!navigator.geolocation || locLoading) return;
+    setLocLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords: { latitude: lat, longitude: lng } }) => {
+        setForm(f => ({ ...f, lat, lng }));
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const d = await r.json();
+          const city = d.address?.city || d.address?.town || d.address?.village || '';
+          const state = d.address?.state || '';
+          if (city || state) setForm(f => ({ ...f, location: [city, state].filter(Boolean).join(', ') }));
+        } catch {}
+        setLocLoading(false);
+      },
+      () => setLocLoading(false),
+      { timeout: 8000 }
+    );
+  };
 
   const submit = async e => {
     e.preventDefault();
@@ -151,6 +175,24 @@ function RegisterInner() {
           <div style={fieldStyle}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             <input type="password" placeholder="Password (min 6 chars)" value={form.password} onChange={set('password')} required minLength={6} style={inputStyle} />
+          </div>
+
+          <div style={fieldStyle}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <input
+              placeholder="City, State (optional)"
+              value={form.location}
+              onChange={e => setForm(f => ({ ...f, location: e.target.value, lat: 0, lng: 0 }))}
+              style={inputStyle}
+            />
+            <button type="button" onClick={detectLocation} disabled={locLoading} style={{
+              background: 'none', border: 'none', cursor: locLoading ? 'not-allowed' : 'pointer',
+              padding: '0 2px', fontSize: 12, fontWeight: 700,
+              color: form.lat ? 'var(--brand)' : '#9CA3AF',
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}>
+              {locLoading ? '⏳' : form.lat ? '✓ Set' : '📍 Detect'}
+            </button>
           </div>
 
           <div style={{ marginTop: 4 }}>
