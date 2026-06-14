@@ -206,6 +206,25 @@ async function initDb() {
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  // Remove posts whose image failed to persist (old Render-disk uploads)
+  await pool.query(`
+    DELETE FROM likes WHERE post_id IN (
+      SELECT id FROM posts WHERE image_url != '' AND image_url NOT LIKE '%/api/images/%' AND image_url NOT LIKE 'https://res.cloudinary.com%'
+    )
+  `);
+  await pool.query(`
+    DELETE FROM comments WHERE post_id IN (
+      SELECT id FROM posts WHERE image_url != '' AND image_url NOT LIKE '%/api/images/%' AND image_url NOT LIKE 'https://res.cloudinary.com%'
+    )
+  `);
+  await pool.query(`
+    DELETE FROM posts WHERE image_url != '' AND image_url NOT LIKE '%/api/images/%' AND image_url NOT LIKE 'https://res.cloudinary.com%'
+  `);
+  // Recalculate posts_count so profile numbers stay accurate
+  await pool.query(`
+    UPDATE users SET posts_count = (SELECT COUNT(*) FROM posts WHERE user_id = users.id)
+  `);
+
   // Seed courts from bundled JSON (only on first boot)
   try {
     const [{ c }] = await db.query("SELECT COUNT(*) as c FROM courts_cache WHERE id LIKE 'seed_%'");
