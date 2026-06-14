@@ -199,6 +199,13 @@ async function initDb() {
     PRIMARY KEY (user_id, reply_id)
   )`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS images (
+    id TEXT PRIMARY KEY,
+    data BYTEA NOT NULL,
+    mimetype TEXT DEFAULT 'image/jpeg',
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   // Seed courts from bundled JSON (only on first boot)
   try {
     const [{ c }] = await db.query("SELECT COUNT(*) as c FROM courts_cache WHERE id LIKE 'seed_%'");

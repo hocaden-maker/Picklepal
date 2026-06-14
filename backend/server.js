@@ -8,7 +8,7 @@ const fs = require('fs');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const { v2: cloudinary } = require('cloudinary');
-const { initDb } = require('./db');
+const { db, initDb } = require('./db');
 
 const app = express();
 const server = http.createServer(app);
@@ -37,6 +37,7 @@ const { authenticate } = require('./middleware');
 app.post('/api/upload', authenticate, upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file' });
 
+  // Cloudinary (if configured) — external CDN, no size concerns
   if (useCloudinary) {
     try {
       const result = await new Promise((resolve, reject) => {
@@ -52,10 +53,26 @@ app.post('/api/upload', authenticate, upload.single('image'), async (req, res) =
     }
   }
 
-  // Local disk fallback — frontend converts relative URL to absolute using VITE_API_URL
-  const filename = `${uuidv4()}${path.extname(req.file.originalname)}`;
-  fs.writeFileSync(path.join(uploadsDir, filename), req.file.buffer);
-  res.json({ url: `/uploads/${filename}` });
+  // Store image in Neon PostgreSQL — survives Render redeploys
+  const id = uuidv4();
+  await db.query(
+    'INSERT INTO images (id, data, mimetype) VALUES ($1, $2, $3)',
+    [id, req.file.buffer, req.file.mimetype || 'image/jpeg']
+  );
+  res.json({ url: `/api/images/${id}` });
+});
+
+// Serve images stored in PostgreSQL (no auth — needed for <img> tags)
+app.get('/api/images/:id', async (req, res) => {
+  try {
+    const rows = await db.query('SELECT data, mimetype FROM images WHERE id = $1', [req.params.id]);
+    if (!rows.length) return res.status(404).end();
+    res.setHeader('Content-Type', rows[0].mimetype || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.end(rows[0].data);
+  } catch {
+    res.status(500).end();
+  }
 });
 
 app.use('/api/auth', require('./routes/auth'));
