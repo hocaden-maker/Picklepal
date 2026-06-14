@@ -86,9 +86,15 @@ function CommentsDrawer({ postId, count, onClose }) {
   );
 }
 
+const POST_TYPES = ['general', 'highlight', 'result', 'milestone', 'tip'];
+
 export default function PostCard({ post: initialPost, onDelete }) {
   const [post, setPost] = useState(initialPost);
   const [showComments, setShowComments] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
   const api = useApi();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -101,6 +107,30 @@ export default function PostCard({ post: initialPost, onDelete }) {
     } catch {
       setPost(p => ({ ...p, liked: wasLiked, likes_count: p.likes_count + (wasLiked ? 1 : -1) }));
     }
+  };
+
+  const openEdit = () => {
+    setEditForm({ content: post.content, post_type: post.post_type, location: post.location || '', score: post.score || '', result: post.result || '' });
+    setShowMenu(false);
+    setShowEdit(true);
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    try {
+      const updated = await api.put(`/posts/${post.id}`, editForm);
+      setPost(p => ({ ...p, ...updated }));
+      setShowEdit(false);
+    } catch {}
+    setSaving(false);
+  };
+
+  const deletePost = async () => {
+    setShowMenu(false);
+    try {
+      await api.del(`/posts/${post.id}`);
+      onDelete?.(post.id);
+    } catch {}
   };
 
   const typeLabel = TYPE_LABELS[post.post_type];
@@ -124,8 +154,8 @@ export default function PostCard({ post: initialPost, onDelete }) {
             </div>
           </div>
           {post.user_id === user?.id && onDelete && (
-            <button style={{ color: 'var(--text-3)', fontSize: 20, padding: '0 4px' }}
-              onClick={() => api.del(`/posts/${post.id}`).then(() => onDelete(post.id)).catch(() => {})}>
+            <button style={{ color: 'var(--text-3)', fontSize: 20, padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer' }}
+              onClick={() => setShowMenu(true)}>
               ···
             </button>
           )}
@@ -182,6 +212,91 @@ export default function PostCard({ post: initialPost, onDelete }) {
           count={post.comments_count}
           onClose={() => setShowComments(false)}
         />
+      )}
+
+      {showMenu && (
+        <div className="drawer-backdrop" onClick={() => setShowMenu(false)}>
+          <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: 'auto' }}>
+            <div className="drawer-handle" />
+            <div style={{ padding: '4px 0 8px' }}>
+              <button onClick={openEdit} style={{ width: '100%', padding: '15px 20px', textAlign: 'left', background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 14 }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={20} height={20}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Edit Post
+              </button>
+              <div style={{ height: 1, background: 'var(--border)', margin: '0 20px' }} />
+              <button onClick={deletePost} style={{ width: '100%', padding: '15px 20px', textAlign: 'left', background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#e53e3e', display: 'flex', alignItems: 'center', gap: 14 }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={20} height={20}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                Delete Post
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEdit && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 700, background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', paddingTop: 'calc(12px + env(safe-area-inset-top))', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+            <button onClick={() => setShowEdit(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px 4px 0', color: 'var(--text)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>Edit Post</div>
+            <button onClick={saveEdit} disabled={saving} className="btn btn-primary btn-sm">
+              {saving ? '…' : 'Save'}
+            </button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <div className="field-label">Caption</div>
+              <div className="field" style={{ height: 90, alignItems: 'flex-start', padding: '10px 14px' }}>
+                <textarea
+                  value={editForm.content}
+                  onChange={e => setEditForm(f => ({ ...f, content: e.target.value }))}
+                  style={{ width: '100%', resize: 'none', fontSize: 15, lineHeight: 1.5, background: 'none', border: 'none', outline: 'none' }}
+                />
+              </div>
+            </div>
+            <div>
+              <div className="field-label">Post Type</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {POST_TYPES.map(t => (
+                  <button key={t} type="button"
+                    className={`chip${editForm.post_type === t ? ' active' : ''}`}
+                    onClick={() => setEditForm(f => ({ ...f, post_type: t }))}
+                    style={{ textTransform: 'capitalize' }}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="field-label">Location</div>
+              <div className="field" style={{ height: 44 }}>
+                <span>📍</span>
+                <input value={editForm.location} onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))} placeholder="Court or city" />
+              </div>
+            </div>
+            {editForm.post_type === 'result' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <div className="field-label">Result</div>
+                  <div className="field" style={{ height: 44 }}>
+                    <select value={editForm.result} onChange={e => setEditForm(f => ({ ...f, result: e.target.value }))} style={{ flex: 1, fontSize: 14 }}>
+                      <option value="">Select…</option>
+                      <option value="win">🏆 Win</option>
+                      <option value="loss">Loss</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <div className="field-label">Score</div>
+                  <div className="field" style={{ height: 44 }}>
+                    <input value={editForm.score} onChange={e => setEditForm(f => ({ ...f, score: e.target.value }))} placeholder="e.g. 11-7, 11-4" style={{ fontSize: 14 }} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </>
   );

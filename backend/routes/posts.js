@@ -56,6 +56,23 @@ router.post('/', authenticate, async (req, res) => {
   res.json(post);
 });
 
+router.put('/:id', authenticate, async (req, res) => {
+  const post = await db.prepare('SELECT user_id FROM posts WHERE id = ?').get(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Not found' });
+  if (post.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+  const { content, post_type, location, score, result } = req.body;
+  await db.prepare(`UPDATE posts SET
+    content = COALESCE(?, content),
+    post_type = COALESCE(?, post_type),
+    location = COALESCE(?, location),
+    score = COALESCE(?, score),
+    result = COALESCE(?, result)
+    WHERE id = ?`)
+    .run(content ?? null, post_type ?? null, location ?? null, score ?? null, result ?? null, req.params.id);
+  const updated = await db.prepare(`SELECT ${WITH_USER}, 0 as liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?`).get(req.params.id);
+  res.json(updated);
+});
+
 router.delete('/:id', authenticate, async (req, res) => {
   const post = await db.prepare('SELECT user_id FROM posts WHERE id = ?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
