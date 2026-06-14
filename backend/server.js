@@ -59,7 +59,9 @@ app.post('/api/upload', authenticate, upload.single('image'), async (req, res) =
     'INSERT INTO images (id, data, mimetype) VALUES ($1, $2, $3)',
     [id, req.file.buffer, req.file.mimetype || 'image/jpeg']
   );
-  res.json({ url: `/api/images/${id}` });
+  // Return absolute URL so it works regardless of VITE_API_URL setting
+  const base = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 3001}`;
+  res.json({ url: `${base}/api/images/${id}` });
 });
 
 // Serve images stored in PostgreSQL (no auth — needed for <img> tags)
