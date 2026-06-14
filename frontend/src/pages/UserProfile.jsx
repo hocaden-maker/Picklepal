@@ -46,8 +46,6 @@ export default function UserProfile() {
   if (loading) return <div className="loading-center" style={{ flex: 1 }}><div className="spinner" style={{ width: 32, height: 32 }} /></div>;
   if (!profile) return <div className="empty-state" style={{ flex: 1 }}><div className="empty-icon">😕</div><div className="empty-title">Player not found</div></div>;
 
-  const winRate = profile.wins + profile.losses > 0 ? Math.round((profile.wins / (profile.wins + profile.losses)) * 100) : 0;
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       <div className="top-nav">
@@ -61,12 +59,20 @@ export default function UserProfile() {
       </div>
 
       <div className="page">
-        <div className="profile-cover">🏓 🎾 🏓</div>
+        <div className="profile-cover" style={profile.cover_url ? { padding: 0 } : {}}>
+          {profile.cover_url
+            ? <img src={profile.cover_url} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            : <span style={{ fontSize: 48, letterSpacing: 10 }}>🏓 🎾 🏓</span>
+          }
+        </div>
 
-        <div style={{ padding: '0 16px' }}>
-          <div style={{ marginTop: -38, marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', paddingRight: 16 }}>
+          <div className="profile-avatar-wrap">
             <Avatar user={profile} size={76} />
           </div>
+        </div>
+
+        <div style={{ padding: '10px 16px 4px' }}>
           <div style={{ fontSize: 20, fontWeight: 800 }}>{profile.display_name}</div>
           <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 2 }}>
             @{profile.username}
@@ -99,10 +105,6 @@ export default function UserProfile() {
           <div className="profile-stat">
             <div className="profile-stat-val">{posts.length}</div>
             <div className="profile-stat-label">Posts</div>
-          </div>
-          <div className="profile-stat">
-            <div className="profile-stat-val" style={{ color: 'var(--brand)' }}>{winRate}%</div>
-            <div className="profile-stat-label">Win Rate</div>
           </div>
           <div className="profile-stat">
             <div className="profile-stat-val">{profile.followers_count}</div>
