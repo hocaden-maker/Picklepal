@@ -62,6 +62,28 @@ router.get('/me/following', authenticate, async (req, res) => {
   res.json(following);
 });
 
+router.get('/:username/followers', authenticate, async (req, res) => {
+  const target = await db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const followers = await db.prepare(`
+    SELECT ${PUB} FROM users
+    WHERE id IN (SELECT follower_id FROM follows WHERE following_id = ?)
+    ORDER BY display_name ASC
+  `).all(target.id);
+  res.json(followers);
+});
+
+router.get('/:username/following', authenticate, async (req, res) => {
+  const target = await db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const following = await db.prepare(`
+    SELECT ${PUB} FROM users
+    WHERE id IN (SELECT following_id FROM follows WHERE follower_id = ?)
+    ORDER BY display_name ASC
+  `).all(target.id);
+  res.json(following);
+});
+
 router.get('/:username', authenticate, async (req, res) => {
   const user = await db.prepare(`SELECT ${PUB} FROM users WHERE username = ?`).get(req.params.username);
   if (!user) return res.status(404).json({ error: 'User not found' });

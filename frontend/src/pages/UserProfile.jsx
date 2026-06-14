@@ -14,6 +14,9 @@ export default function UserProfile() {
   const [loading, setLoading] = useState(true);
   const [following, setFollowing] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
+  const [followSheet, setFollowSheet] = useState(null);
+  const [followList, setFollowList] = useState([]);
+  const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -35,6 +38,17 @@ export default function UserProfile() {
       setFollowing(was);
       setProfile(p => ({ ...p, followers_count: p.followers_count + (was ? 1 : -1) }));
     }
+  };
+
+  const openFollowSheet = async (type) => {
+    setFollowSheet(type);
+    setFollowLoading(true);
+    setFollowList([]);
+    try {
+      const data = await api.get(`/users/${username}/${type}`);
+      setFollowList(data);
+    } catch {}
+    setFollowLoading(false);
   };
 
   const invite = async () => {
@@ -106,11 +120,11 @@ export default function UserProfile() {
             <div className="profile-stat-val">{posts.length}</div>
             <div className="profile-stat-label">Posts</div>
           </div>
-          <div className="profile-stat">
+          <div className="profile-stat" style={{ cursor: 'pointer' }} onClick={() => openFollowSheet('followers')}>
             <div className="profile-stat-val">{profile.followers_count}</div>
             <div className="profile-stat-label">Followers</div>
           </div>
-          <div className="profile-stat">
+          <div className="profile-stat" style={{ cursor: 'pointer' }} onClick={() => openFollowSheet('following')}>
             <div className="profile-stat-val">{profile.following_count}</div>
             <div className="profile-stat-label">Following</div>
           </div>
@@ -162,6 +176,34 @@ export default function UserProfile() {
         }
         <div style={{ height: 16 }} />
       </div>
+
+      {followSheet && (
+        <div className="drawer-backdrop" onClick={() => setFollowSheet(null)}>
+          <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '75vh' }}>
+            <div className="drawer-handle" />
+            <div className="drawer-title">{followSheet === 'followers' ? 'Followers' : 'Following'}</div>
+            <div className="drawer-body" style={{ overflowY: 'auto', paddingTop: 0 }}>
+              {followLoading
+                ? <div className="loading-center"><div className="spinner" /></div>
+                : followList.length === 0
+                  ? <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '32px 0', fontSize: 14 }}>
+                      {followSheet === 'followers' ? 'No followers yet' : 'Not following anyone yet'}
+                    </div>
+                  : followList.map(person => (
+                      <div key={person.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                        onClick={() => { setFollowSheet(null); navigate(`/u/${person.username}`); }}>
+                        <Avatar user={person} size={44} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.display_name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>@{person.username}</div>
+                        </div>
+                      </div>
+                    ))
+              }
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
