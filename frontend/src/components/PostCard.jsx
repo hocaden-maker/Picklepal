@@ -46,40 +46,42 @@ function CommentsDrawer({ postId, count, onClose }) {
   };
 
   return (
-    <div className="drawer-backdrop" onClick={onClose}>
-      <div className="drawer" onClick={e => e.stopPropagation()}>
-        <div className="drawer-handle" />
-        <div className="drawer-title">Comments ({count})</div>
-        <div className="drawer-body">
-          {comments === null
-            ? <div className="loading-center"><div className="spinner" /></div>
-            : comments.length === 0
-              ? <div style={{ color: 'var(--text-3)', fontSize: 14, textAlign: 'center', padding: '24px 0' }}>No comments yet. Be first!</div>
-              : comments.map(c => (
-                <div key={c.id} className="comment-row">
-                  <Avatar user={c} size={32} />
-                  <div className="comment-content">
-                    <span><strong>{c.display_name}</strong> {c.content}</span>
-                    <div className="comment-time">{timeAgo(c.created_at)}</div>
-                  </div>
-                </div>
-              ))
-          }
-        </div>
-        <form className="drawer-input" onSubmit={submit}>
-          <Avatar user={user} size={32} />
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="Add a comment…"
-            autoFocus
-          />
-          <button type="submit" disabled={!input.trim() || submitting}
-            style={{ fontSize: 20, color: input.trim() ? 'var(--brand)' : 'var(--text-3)', background: 'none', border: 'none' }}>
-            ↑
-          </button>
-        </form>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', paddingTop: 'calc(12px + env(safe-area-inset-top))', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px 4px 0', color: 'var(--text)' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div style={{ fontWeight: 700, fontSize: 16 }}>Comments {count > 0 ? `(${count})` : ''}</div>
       </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+        {comments === null
+          ? <div className="loading-center"><div className="spinner" /></div>
+          : comments.length === 0
+            ? <div style={{ color: 'var(--text-3)', fontSize: 14, textAlign: 'center', padding: '40px 0' }}>No comments yet. Be first!</div>
+            : comments.map(c => (
+              <div key={c.id} className="comment-row">
+                <Avatar user={c} size={36} />
+                <div className="comment-content">
+                  <span><strong>{c.display_name}</strong> {c.content}</span>
+                  <div className="comment-time">{timeAgo(c.created_at)}</div>
+                </div>
+              </div>
+            ))
+        }
+      </div>
+      <form className="drawer-input" onSubmit={submit} style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
+        <Avatar user={user} size={32} />
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          placeholder="Add a comment…"
+          autoFocus
+        />
+        <button type="submit" disabled={!input.trim() || submitting}
+          style={{ fontSize: 20, color: input.trim() ? 'var(--brand)' : 'var(--text-3)', background: 'none', border: 'none' }}>
+          ↑
+        </button>
+      </form>
     </div>
   );
 }
