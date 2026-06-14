@@ -52,11 +52,10 @@ app.post('/api/upload', authenticate, upload.single('image'), async (req, res) =
     }
   }
 
-  // Local disk fallback (dev only — not persistent on Render)
+  // Local disk fallback — frontend converts relative URL to absolute using VITE_API_URL
   const filename = `${uuidv4()}${path.extname(req.file.originalname)}`;
   fs.writeFileSync(path.join(uploadsDir, filename), req.file.buffer);
-  const origin = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
-  res.json({ url: `${origin}/uploads/${filename}` });
+  res.json({ url: `/uploads/${filename}` });
 });
 
 app.use('/api/auth', require('./routes/auth'));
